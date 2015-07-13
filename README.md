@@ -10,9 +10,9 @@ Features include:
 
 * Chain an unlimited number of arbitrary validation or type conversion functions
 * Combine types with `.and()` and `.or()`
-* Default values or "required" properties
+* Properties can have default values or require explicit initialization
 * Subclasses inherit base class schema, and only need to add their changes or additions
-* Properties always enumerate in the same order per instance, and instances are initialized monomorphically
+* Properties always enumerate in schema definition order, and instances are initialized monomorphically
 * Property definitions can include arbitrary metadata that can be used for validation, conversion, storage management, help listings, command-line options, etc.
 * Customizable backing store for property data
 * Runs in any ES5+ environment, including Node, io.js, and most "modern" browsers
@@ -398,7 +398,7 @@ Whatever.prototype.__setup_storage__ = function (name) { ... }
 
 ### Misc. Utility functions
 
-For your convenience, `prop-schema` exposes a few of its internally-used utility functions.  `isPlainObject()` and `assign()` are used by the `props.object` type to detect plain objects and clone them.  They are exposed so that you can build similar types, such as a recursively-cloning object type.  `compose()` may occasionally be useful for advanced metaprogramming, and is included for API completeness.
+For your convenience, `prop-schema` exposes a few of its internally-used utility functions.  `isPlainObject()` and `assign()` are used by the `props.object` type to detect plain objects and clone them.  They are exposed so that you can build similar types, such as a recursively-cloning object type.  `compose()` may occasionally be useful for advanced metaprogramming, and is included for API completeness.  Finally, `defineProperties()` exposes the core functionality of the `props()` function in a reusable way.
 
 * `props.isPlainObject(ob)` -- returns true if `ob` is a plain `Object` (i.e., has a prototype of exactly `Object.prototype`)
 
@@ -406,4 +406,4 @@ For your convenience, `prop-schema` exposes a few of its internally-used utility
 
 * `props.compose(typeOrFunction, ...)` -- similar to `props.type()`, except that it returns a converter/validator function instead of a property type.  That is, the returned function takes a value and returns a converted value or throws an error.  It does *not* have `.or()` or `.and()` methods, nor can it be used as shorthand to specify properties.  You will probably never need this function unless you are creating your own type composition functions, or wish to turn a type back into a converter/validator function.  (i.e. `props.compose(aType)` converts `aType` back to a plain converter/validator function.)
 
-
+* `props.defineProperties(ob, schema, factory, prototype)` -- define properties on `ob` according to `schema`, calling `factory(name, spec)` to generate the property descriptors.  If no `factory()` is supplied, `ob.__prop_desc__()` is used, or the default implementation if `ob` doesn't have a `__prop_desc__()` method.  If `prototype` is supplied, its `__specs__`, `__defaults__`, and `__names__` properties are created or updated, as appropriate.  This is basically the internal implementation of the `props()` function, minus syntax sugar.  It's exposed so you can do things like, say, create a proxy object that loads its data from a database on first access, and then redefines all its properties again to refer to stored values.
