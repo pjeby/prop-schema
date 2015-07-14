@@ -1,5 +1,7 @@
 # Schema-Driven Properties
 
+    args = require 'normalize-arguments'
+
     module.exports = props = (cls, schema) ->
         [cls, schema] = args(arguments, [args.fn(), args.object({})])
         cls ?= class extends props.Base
@@ -16,6 +18,7 @@
         return dest
 
     props.compose = (rest..., f) ->
+        throw new TypeError("not a function") unless typeof f is 'function'
         f = (f.converter ? f)
         return f unless rest.length
         g = props.compose(rest...)
@@ -26,7 +29,7 @@
             [val, doc, meta, rest...] = args(arguments, [
              args.any, args.string(""), args.object({})
             ])
-            return props.spec(val, doc, meta, f, rest...)
+            return new props.spec(val, doc, meta, f, rest...)
         factory.converter = props.compose(f)
         return factory
 
@@ -34,14 +37,10 @@
         throw new TypeError @name+" "+message unless filter?(val)
         return val
 
+
+
     ['number', 'string', 'function', 'boolean'].forEach (t) ->
         props[t] = props.check "must be a "+t, (v) -> typeof v is t
-
-
-
-
-
-
 
     props.defineProperties = (ob, schema, factory, proto) ->
         if proto
@@ -55,7 +54,6 @@
             names = proto.__names__
 
         factory ?= ob.__prop_desc__ ? props.Base::__prop_desc__
-
         Object.keys(schema).forEach (name) ->
             spec = Object.create(schema[name], name: value: name, enumerable: yes)
             if proto
@@ -64,8 +62,6 @@
             Object.defineProperty(ob, name, factory(name, spec))
 
         names?.splice(0, names.length, Object.keys(defaults)...)
-
-    args = require 'normalize-arguments'
 
     class props.spec
         identity = (v) -> v

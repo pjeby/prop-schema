@@ -43,6 +43,9 @@ describe "Type and Function Composition", ->
 
     describe "Compositional Algebra", ->
 
+        it "compose(..., non-function) -> TypeError", ->
+            expect(compose).to.throw TypeError, /not a function/
+
         it "compose(fn) == fn", ->
             expect(compose(f = ->)).to.equal f
 
@@ -74,9 +77,6 @@ describe "Type and Function Composition", ->
 
         it "handles many arguments", ->
             expect(compose(f,g,h)(3)).to.equal 5
-
-
-
 
 
 
