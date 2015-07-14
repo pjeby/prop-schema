@@ -31,13 +31,17 @@
             ])
             return new props.spec(val, doc, meta, f, rest...)
         factory.converter = props.compose(f)
+        factory.and = (g) -> props.type(f, g)
+        factory.or = (g) ->
+            g = props.compose(g)
+            props.type (v) -> try f.call(this, v) catch e then g.call(this, v)
         return factory
+
+
 
     props.check = (message, filter) -> props.type (val) ->
         throw new TypeError @name+" "+message unless filter?(val)
         return val
-
-
 
     ['number', 'string', 'function', 'boolean'].forEach (t) ->
         props[t] = props.check "must be a "+t, (v) -> typeof v is t
@@ -73,10 +77,47 @@
             @meta = props.assign {}, meta
             @convert = if rest.length then props.compose(rest...) else identity
 
+
+
+
     class props.Base
         __prop_desc__: (name, spec) ->
             get: -> @__props[name]
             set: (v) -> @__props[name] = spec.convert(v)
             configurable: yes
             enumerable: yes
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

@@ -17,9 +17,9 @@ util = require 'util'
 
 items = (val) -> Object.keys(val).map (k) -> [k, val[k]]
 
-
-
-
+withSpy = (ob, name, fn) ->
+    s = spy.named name, ob, name
+    try fn(s) finally s.restore()
 
 
 
@@ -69,8 +69,8 @@ describe "Type and Function Composition", ->
         it "calls f and g with same context", ->
             f_ = spy.named 'f', f; g_ = spy.named 'g', g
             compose(f_, g_).call(t = {}, 42)
-            expect(f_).to.have.been.calledOn(t)
-            expect(g_).to.have.been.calledOn(t)
+            f_.should.have.been.calledOn(t)
+            g_.should.have.been.calledOn(t)
 
         it "unwraps types", ->
             expect(compose(type(f),type(g))(3)).to.equal 8
@@ -80,12 +80,46 @@ describe "Type and Function Composition", ->
 
 
 
-    describe "type(f1).and(x)", ->
-        it "returns type(f1, x)"
+    describe "type(a).and(b)", ->
 
-    describe "type(f1).or(x)(val)", ->
-        it "calls f1(val) first"
-        it "calls compose(x)(val) if f1(val) throws"
+        it "returns type(a, b)", -> withSpy props, 'type', (t) ->
+            ret = type(a=->).and(b=->)
+            t.should.have.been.calledOnce
+            t.should.have.been.calledWithExactly(a, b)
+            t.should.have.returned(ret)
+
+    describe "type(a).or(b)(val)", ->
+
+        it "calls a[.converter](val) first", ->
+            a = spy.named 'a', -> 42
+            b = spy.named 'b', (x) -> x * 2
+            expect(type(a).or(b).converter.call(ob={}, 21)).to.equal 42
+            a.should.have.been.calledOnce
+            a.should.have.been.calledOn(ob)
+            b.should.not.have.been.called
+
+        it "calls b[.converter](val) if a(val) throws", ->
+            a = spy.named 'a', -> throw new Error
+            b = spy.named 'b', (x) -> x * 2
+            expect(type(a).or(type b).converter.call(ob={}, 12)).to.equal 24
+            a.should.have.been.calledOnce
+            a.should.have.been.calledOn(ob)
+            b.should.have.been.calledOnce
+            b.should.have.been.calledOn(ob)
+            
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     describe "type(fn)(...,cvt..) -> spec(...,fn,cvt...)", ->
 
@@ -100,17 +134,24 @@ describe "Type and Function Composition", ->
 
         it "with converter functions", ->
             t = type(f=->)
-            c = spy.named 'compose', props, 'compose'
-            try
+            withSpy props, 'compose', (c) ->
                 t(42, g=->)
-                expect(c).to.have.been.calledWithExactly(f, g)
-            finally c.restore()
+                c.should.have.been.calledWithExactly(f, g)
 
         it "with metadata only", ->
             s = type(f=->)(99, {x:1})
             expect(s.value).to.equal 99
             expect(s.meta).to.eql {x: 1}
             expect(s.convert).to.equal f
+
+
+
+
+
+
+
+
+
 
 
 
@@ -206,14 +247,12 @@ describe "Composed types", ->
 describe "props(cls, schema)", ->
 
     it "-> defineProperties(cls.prototype, schema, undefined, cls.prototype)", ->
-        dp = spy props, 'defineProperties'
-        try
+        withSpy props, 'defineProperties', (dp) ->
             props(class cls, schema={})
-            expect(dp).to.have.been.calledOnce
-            expect(dp).to.have.been.calledWithExactly(
+            dp.should.have.been.calledOnce
+            dp.should.have.been.calledWithExactly(
                 cls::, schema, undefined, cls::
             )
-        finally dp.restore()
 
 
 describe "props(schema)", ->
@@ -223,14 +262,16 @@ describe "props(schema)", ->
         expect(Object.getPrototypeOf(cls::)).to.equal Base::
 
     it "-> defineProperties(cls.prototype, schema, undefined, cls.prototype)", ->
-        dp = spy props, 'defineProperties'
-        try
+        withSpy props, 'defineProperties', (dp) ->
             cls = props(schema={})
-            expect(dp).to.have.been.calledOnce
-            expect(dp).to.have.been.calledWithExactly(
+            dp.should.have.been.calledOnce
+            dp.should.have.been.calledWithExactly(
                 cls::, schema, undefined, cls::
             )
-        finally dp.restore()
+
+
+
+
 
 
 
@@ -349,18 +390,18 @@ describe "Utilities", ->
                 expect(@ob.__props).to.eql {x:55}
 
         it "uses props.Base::__prop_desc__ as a default factory", ->
-            s = spy Base::, '__prop_desc__'
-            try
+            withSpy Base.prototype, '__prop_desc__', (s) ->
                 defineProperties(ob = {}, schema)
-                expect(s).to.have.been.calledOnce
-                expect(s).to.have.been.calledWith('x')
-            finally s.restore()
+                s.should.have.been.calledOnce
+                s.should.have.been.calledWith('x')
 
         it "uses ob.__prop_desc__ as a factory if available", ->
             ob = __prop_desc__: s = spy (name, ps) -> value: ps
             defineProperties(ob, schema)
-            expect(s).to.have.been.calledOnce
-            expect(s).to.have.been.calledWith('x')
+            s.should.have.been.calledOnce
+            s.should.have.been.calledWith('x')
+
+
 
 
 
