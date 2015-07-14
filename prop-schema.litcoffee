@@ -1,6 +1,10 @@
 # Schema-Driven Properties
 
-    props = exports
+    module.exports = props = (cls, schema) ->
+        [cls, schema] = args(arguments, [args.fn(), args.object({})])
+        cls ?= class extends props.Base
+        props.defineProperties(cls::, schema, undefined, cls::)
+        cls
 
     props.isPlainObject = (val) ->
         typeof val is "object" and val isnt null and

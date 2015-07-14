@@ -157,7 +157,7 @@ describe "Properrty Specifiers", ->
             expect(spec(42,f=->).convert).to.equal f
             expect(spec(42,{},type(f)).convert).to.equal f
 
-
+        it ".required == meta.required"
 
 
 
@@ -204,22 +204,61 @@ describe "Composed types", ->
 
 
 describe "props(cls, schema)", ->
-    it "-> defineProperties(cls.prototype, schema, undefined, cls.prototype)"
+
+    it "-> defineProperties(cls.prototype, schema, undefined, cls.prototype)", ->
+        dp = spy props, 'defineProperties'
+        try
+            props(class cls, schema={})
+            expect(dp).to.have.been.calledOnce
+            expect(dp).to.have.been.calledWithExactly(
+                cls::, schema, undefined, cls::
+            )
+        finally dp.restore()
+
 
 describe "props(schema)", ->
-    it "returns a new subclass of props.Base"
-    it "-> defineProperties(cls.prototype, schema, undefined, cls.prototype)"
+
+    it "returns a new subclass of props.Base", ->
+        cls = props(schema={})
+        expect(Object.getPrototypeOf(cls::)).to.equal Base::
+
+    it "-> defineProperties(cls.prototype, schema, undefined, cls.prototype)", ->
+        dp = spy props, 'defineProperties'
+        try
+            cls = props(schema={})
+            expect(dp).to.have.been.calledOnce
+            expect(dp).to.have.been.calledWithExactly(
+                cls::, schema, undefined, cls::
+            )
+        finally dp.restore()
+
+
+
+
+
+
+
+
+
+
+
 
 
 describe "Instance Initialization", ->
 
     describe "Base.call()", ->
+        it "throws if called without explicit `this`"
         describe "invokes __setup_storage__ before validation", ->
             it "using the current implementation"
             it "using the default implementation"
 
-        it "validates all its arguments w/__validate_intiializer__"
-        it "calls __initialize_from__ last"
+        describe "validates all its arguments w/__validate_intiializer__", ->
+            it "using the current implementation"
+            it "using the default implementation"
+
+        describe "calls __initialize_from__ last", ->
+            it "using the current implementation"
+            it "using the default implementation"
 
     describe "__setup_storage__", ->
         it "sets .__props to a copy of .__defaults__"
@@ -241,6 +280,8 @@ describe "Instance Initialization", ->
         it "uses the first source with a property"
         it "initializes all properties, even if not specified"
         it "throws when a required property is missing"
+
+
 
 
 
