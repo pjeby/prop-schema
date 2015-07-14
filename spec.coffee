@@ -10,12 +10,12 @@ spy.named = (name, args...) ->
     return s
 
 {
-    Base, spec, assign, isPlainObject, type, compose, check
+    Base, spec, assign, isPlainObject, type, compose, check, defineProperties
 } = props = require './'
 
 util = require 'util'
 
-
+items = (val) -> Object.keys(val).map (k) -> [k, val[k]]
 
 
 
@@ -211,36 +211,36 @@ describe "props(schema)", ->
     it "-> defineProperties(cls.prototype, schema, undefined, cls.prototype)"
 
 
-
-
 describe "Instance Initialization", ->
 
+    describe "Base.call()", ->
+        describe "invokes __setup_storage__ before validation", ->
+            it "using the current implementation"
+            it "using the default implementation"
+
+        it "validates all its arguments w/__validate_intiializer__"
+        it "calls __initialize_from__ last"
+
     describe "__setup_storage__", ->
+        it "sets .__props to a copy of .__defaults__"
+        it "makes .__props non-enumerable"
+
     describe "__validate_initializer__", ->
+        it "accepts plain objects"
+        it "accepts instances of the current class"
+        it "rejects unrelated classes"
+        describe "invokes __validate_names__ on plain objects", ->
+            it "using the current implementation"
+            it "using the default implementation"
+
     describe "__validate_names__", ->
+        it "rejects objects with enumerable-own properties not in schema"
+
     describe "__initialize_from__", ->
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        it "accepts multiple sources"
+        it "uses the first source with a property"
+        it "initializes all properties, even if not specified"
+        it "throws when a required property is missing"
 
 
 
@@ -261,8 +261,6 @@ describe "Utilities", ->
             expect(assign(x={a:1}, b:2, undefined, {a:3})).to.eql {a:3, b:2}
 
         it "maintains iteration order", ->
-            items = (val) -> Object.keys(val).map (k) -> [k, val[k]]
-
             expect(items(assign({}, {b: 3, a:1, c:1}, c:5)))
             .to.eql [['b', 3], ['a', 1], ['c', 5]]
 
@@ -285,25 +283,191 @@ describe "Utilities", ->
 
 
 
+
+
+    describe "defineProperties(ob, schema)", ->
+
+        schema = x: spec(42, parseInt)
+
+        describe "creates descriptors that", ->
+
+            beforeEach -> defineProperties(@ob={}, schema)
+
+            it "are enumerable and configurable", ->
+                desc = Object.getOwnPropertyDescriptor(@ob, 'x')
+                expect(desc.enumerable).to.equal(true, 'enumerable')
+                expect(desc.configurable).to.equal(true, 'configurable')
+
+            it "delegate to .__props", ->
+                @ob.__props = {x: 99}
+                expect(@ob.x).to.equal 99
+
+            it "set the value from spec.convert(value)", ->
+                @ob.__props = {}
+                @ob.x = "55 mph"
+                expect(@ob.__props).to.eql {x:55}
+
+        it "uses props.Base::__prop_desc__ as a default factory", ->
+            s = spy Base::, '__prop_desc__'
+            try
+                defineProperties(ob = {}, schema)
+                expect(s).to.have.been.calledOnce
+                expect(s).to.have.been.calledWith('x')
+            finally s.restore()
+
+        it "uses ob.__prop_desc__ as a factory if available", ->
+            ob = __prop_desc__: s = spy (name, ps) -> value: ps
+            defineProperties(ob, schema)
+            expect(s).to.have.been.calledOnce
+            expect(s).to.have.been.calledWith('x')
+
+
+
+
+
+
     describe "defineProperties(ob, schema, factory)", ->
 
         describe "invokes factory(name, spec) for each schema item", ->
-            it "with a named spec"
-            it "passing the result to Object.defineProperty(ob, name, ...)"
-            it "using props.Base::__prop_desc__ as a default factory"
-            it "using ob.__prop_desc__ as a factory if available"
+
+            beforeEach ->
+                schema = b: spec("b"), c: spec("c"), a: spec("a")
+                @results = []
+                my = this
+                defineProperties @ob={}, schema, @factory = (name, ps) ->
+                    my.results.push name
+                    value: ps
+
+            it "in schema order", ->
+                expect(@results).to.eql ['b', 'c', 'a']
+
+            it "with a named spec", ->
+                ['b', 'c', 'a'].forEach (name) =>
+                    expect(@ob[name].name).to.equal name
+
+            it "defining the named property", ->
+                ['b', 'c', 'a'].forEach (name) =>
+                    expect(@ob[name].value).to.equal name
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     describe "defineProperties(ob, schema, factory, proto)", ->
 
+        expectNamedSpec = (spec, name, base, message) ->
+            expect(spec.name).to.equal(name, message+": bad name")
+            expect(Object.getPrototypeOf(spec)).to.equal(base, message+": bad prototype")
+            expect(Object.getOwnPropertyNames(spec))
+            .to.eql(['name'], message+": bad keys")
+
+        schema1 = b: spec("b"), c: spec("c"), a: spec("a")
+        schema2 = a: spec("A"), d: spec("D"), b: spec ("B")
+
+        beforeEach ->
+            defineProperties(@ob={}, schema1, null, @proto={})
+
         describe "initially configures", ->
-            it "__specs__"
-            it "__defaults__"
-            it "__names__"
+            it "__specs__", ->
+                specs = @proto.__specs__
+                expect(Object.keys(specs)).to.eql ['b', 'c', 'a']
+                ['b', 'c', 'a'].forEach (name) =>
+                    expectNamedSpec(specs[name], name, schema1[name], name)
+
+            it "__defaults__", ->
+                expect(Object.getOwnPropertyDescriptor(@proto, '__defaults__'))
+                .to.eql(
+                    enumerable: no, configurable: no, writable: no,
+                    value: {b:'b', c: 'c', a:'a'}
+                )
+                expect(items(@proto.__defaults__))
+                .to.eql [['b', 'b'], ['c', 'c'], ['a', 'a']]
+
+            it "__names__", ->
+                expect(Object.getOwnPropertyDescriptor(@proto, '__names__'))
+                .to.eql(
+                    enumerable: no, configurable: no, writable: no,
+                    value: ['b','c','a']
+                )
+
+
+
+
 
         describe "updates", ->
-            it "__specs__"
-            it "__defaults__"
-            it "__names__"
+
+            beforeEach -> defineProperties(@ob, schema2, null, @proto)
+
+            it "__specs__", ->
+                specs = @proto.__specs__
+                expect(Object.keys(specs)).to.eql ['b', 'c', 'a', 'd']
+
+                ['b', 'd', 'a'].forEach (name) =>
+                    expectNamedSpec(specs[name], name, schema2[name], name)
+
+                expectNamedSpec(specs.c, 'c', schema1.c, 'c')
+
+            it "__defaults__", ->
+                expect(items(@proto.__defaults__))
+                .to.eql [['b', 'B'], ['c', 'c'], ['a', 'A'], ['d', 'D']]
+
+            it "__names__", ->
+                expect(@proto.__names__).to.eql ['b', 'c', 'a', 'd']
+
+        describe "inherits", ->
+
+            beforeEach ->
+                @proto2=Object.create(@proto)
+                defineProperties(@ob, schema2, null, @proto2)
+
+            it "__specs__", ->
+                specs = @proto2.__specs__
+                expect(Object.keys(specs)).to.eql ['b', 'c', 'a', 'd']
+
+                ['b', 'd', 'a'].forEach (name) =>
+                    expectNamedSpec(specs[name], name, schema2[name], name)
+
+                expectNamedSpec(specs.c, 'c', schema1.c, 'c')
+
+                specs = @proto.__specs__
+                expect(Object.keys(specs)).to.eql ['b', 'c', 'a']
+                ['b', 'c', 'a'].forEach (name) =>
+                    expectNamedSpec(specs[name], name, schema1[name], name+"(base)")
+
+
+            it "__defaults__", ->
+                expect(items(@proto.__defaults__))
+                .to.eql [['b', 'b'], ['c', 'c'], ['a', 'a']]
+                expect(items(@proto2.__defaults__))
+                .to.eql [['b', 'B'], ['c', 'c'], ['a', 'A'], ['d', 'D']]
+
+            it "__names__", ->
+                expect(@proto.__names__).to.eql ['b', 'c', 'a']
+                expect(@proto2.__names__).to.eql ['b', 'c', 'a', 'd']
+
+
+
+
+
+
+
+
+
+
 
 
 

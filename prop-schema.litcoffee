@@ -39,6 +39,28 @@
 
 
 
+    props.defineProperties = (ob, schema, factory, proto) ->
+        if proto
+            Object.defineProperties(proto,
+                __defaults__: value: props.assign {}, proto.__defaults__
+                __specs__: value: props.assign {}, proto.__specs__
+                __names__: value: []
+            ) unless proto.hasOwnProperty('__defaults__')
+            defaults = proto.__defaults__
+            specs = proto.__specs__
+            names = proto.__names__
+
+        factory ?= ob.__prop_desc__ ? props.Base::__prop_desc__
+
+        Object.keys(schema).forEach (name) ->
+            spec = Object.create(schema[name], name: value: name, enumerable: yes)
+            if proto
+                defaults[name] = spec.value
+                specs[name] = spec
+            Object.defineProperty(ob, name, factory(name, spec))
+
+        names?.splice(0, names.length, Object.keys(defaults)...)
+
     args = require 'normalize-arguments'
 
     class props.spec
@@ -51,32 +73,10 @@
             @meta = props.assign {}, meta
             @convert = if rest.length then props.compose(rest...) else identity
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    class props.Base
+        __prop_desc__: (name, spec) ->
+            get: -> @__props[name]
+            set: (v) -> @__props[name] = spec.convert(v)
+            configurable: yes
+            enumerable: yes
 
