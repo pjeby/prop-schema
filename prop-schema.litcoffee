@@ -26,6 +26,19 @@
         factory.converter = props.compose(f)
         return factory
 
+    props.check = (message, filter) -> props.type (val) ->
+        throw new TypeError @name+" "+message unless filter?(val)
+        return val
+
+    ['number', 'string', 'function', 'boolean'].forEach (t) ->
+        props[t] = props.check "must be a "+t, (v) -> typeof v is t
+
+
+
+
+
+
+
     args = require 'normalize-arguments'
 
     class props.spec
@@ -37,3 +50,33 @@
             ])
             @meta = props.assign {}, meta
             @convert = if rest.length then props.compose(rest...) else identity
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

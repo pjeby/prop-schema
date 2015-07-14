@@ -9,11 +9,11 @@ spy.named = (name, args...) ->
     s.displayName = name
     return s
 
-{Base, spec, assign, isPlainObject, type, compose} = props = require './'
+{
+    Base, spec, assign, isPlainObject, type, compose, check
+} = props = require './'
 
 util = require 'util'
-
-
 
 
 
@@ -101,8 +101,9 @@ describe "Type and Function Composition", ->
         it "with converter functions", ->
             t = type(f=->)
             c = spy.named 'compose', props, 'compose'
-            t(42, g=->)
-            try expect(c).to.have.been.calledWithExactly(f, g)
+            try
+                t(42, g=->)
+                expect(c).to.have.been.calledWithExactly(f, g)
             finally c.restore()
 
         it "with metadata only", ->
@@ -111,14 +112,29 @@ describe "Type and Function Composition", ->
             expect(s.meta).to.eql {x: 1}
             expect(s.convert).to.equal f
 
-    it "check(message)() always throws"
-    it "check(filter, message)(val) throws unless filter(val)"
 
 
 
 
 
 
+
+
+
+    it "check(message).converter() always throws", ->
+        expect(-> check("test message").converter.call(name:"foo"))
+        .to.throw(TypeError, /foo test message/)
+
+    describe "check(filter, message).converter(val)", ->
+
+        cvt = check("must be plain", isPlainObject).converter
+
+        it "returns val if filter(val)", ->
+            expect(cvt.call(name:"foo", o={})).to.equal o
+
+        it "throws unless filter(val)", ->
+            expect(-> cvt.call(name:"bar", 99))
+            .to.throw(TypeError, /bar must be plain/)
 
 
 describe "Properrty Specifiers", ->
@@ -143,13 +159,19 @@ describe "Properrty Specifiers", ->
 
 
 
+
+
+
 describe "Basic types", ->
-  for own k, v of defaults = {string:"x", number:42, boolean:yes, function:->}
-    do (k, v, t = props[k]) ->
-      describe "."+k, ->
-        it "accepts #{k}"
-        for own kk, vv of defaults when kk isnt k
-          it "rejects #{kk}"
+    for own k, v of defaults = {string:"x", number:42, boolean:yes, function:->}
+        do (k, v, t = props[k]) ->
+            describe "."+k, ->
+                it "accepts #{k}", ->
+                    expect(t.converter(v)).to.equal v
+                for own kk, vv of defaults when kk isnt k then do (kk, vv) ->
+                    it "rejects #{kk}", ->
+                        expect(-> t.converter.call(name: kk, vv))
+                        .to.throw(TypeError, ///#{kk}\ must\ be\ a\ #{k}///)
 
 describe "Composed types", ->
 
@@ -174,6 +196,13 @@ describe "Composed types", ->
         it "rejects numbers less than 0"
 
 
+
+
+
+
+
+
+
 describe "props(cls, schema)", ->
     it "-> defineProperties(cls.prototype, schema, undefined, cls.prototype)"
 
@@ -190,6 +219,18 @@ describe "Instance Initialization", ->
     describe "__validate_initializer__", ->
     describe "__validate_names__", ->
     describe "__initialize_from__", ->
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
