@@ -213,11 +213,11 @@ As you can see, `prop-schema` is not dependent on any particular inheritance imp
 
 By default, the actual property values of an instance of a schema-controlled class are stored in its `.__props` property, and the property descriptors themselves are inherited from the class's prototype.  This works fine for code that is accessing properties by name or looping over all enumerable properties, but it does not work for `JSON.stringify()`, `util.inspect()`, or other things that only enumerate over own-properties.
 
-This can easily be worked around by calling `props.defineProperties(this, this.__schema__.specs)` in your class's constructor, to forcibly add the descriptors to each instance.  The trade-off is a reduction in speed of property access, and increased storage space per instance, so it is not done by default.  There is also no way to undo it once it has been done to a given instance.  (Also, it's only a partial fix for `util.inspect()`, which will display all property values as `[Getter/Setter]` instead of their actual values.)
+This can easily be worked around by calling `this.__schema__.defineProperties(this)` in your class's constructor, to forcibly add the descriptors to each instance.  The trade-off is a reduction in speed of property access, and increased storage space per instance, so it is not done by default.  There is also no way to undo it once it has been done to a given instance.  (Also, it's only a partial fix for `util.inspect()`, which will display all property values as `[Getter/Setter]` instead of their actual values.)
 
 Of course, if you want to avoid the performance cost, and only need to support `JSON.stringify()` or `util.inspect()`, you can always define a `.toJSON()` method that returns `.__props`, and/or a similar method for `.inspect()`.  (Which then works around the `Getter/Setter]` limitation.)
 
-For more information on how properties are stored (and how to change it), see the section below on "Customizing Storage".  For more information on `props.defineProperties()`, see the section below on "Misc. Utility Functions".
+For more information on how properties are stored (and how to customize that storage), see the section below on "Customizing Storage".
 
 
 ### Specifying Properties

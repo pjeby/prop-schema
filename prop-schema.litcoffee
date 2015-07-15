@@ -56,29 +56,40 @@
     props.nonNegative = props.number.and props.check "must be >= 0",
         (v) -> v >= 0
 
+    createSchema = (base=defaultSchema) ->
+        schema = Object.create(base)
+        schema.specs = props.assign {}, schema.specs
+        schema.defaults = props.assign {}, schema.defaults
+        return schema
+
+    defaultSchema =
+        update: (specs) ->
+            for name in Object.keys(specs)
+                @specs[name] = spec = Object.create(
+                    specs[name], name: value: name, enumerable: yes
+                )
+                @defaults[name] = spec.value
+            @names = Object.keys(@specs)
+            return this
+
+        defineProperties: (ob, factory) ->
+            factory ?= ob.__prop_desc__ ? props.Base::__prop_desc__
+            for name in @names
+                Object.defineProperty(ob, name, factory(name, @specs[name]))
+
+
+
+
     props.defineProperties = (ob, specs, factory, proto) ->
         if proto
             unless proto.hasOwnProperty('__schema__')
-                schema = Object.create(proto.__schema__ ? {})
-                schema.specs = props.assign {}, schema.specs
-                schema.defaults = props.assign {}, schema.defaults
-                Object.defineProperty(proto, '__schema__', value: schema)
+                Object.defineProperty(
+                    proto, '__schema__', value: createSchema(proto.__schema__)
+                )
             schema = proto.__schema__
-
-        factory ?= ob.__prop_desc__ ? props.Base::__prop_desc__
-        Object.keys(specs).forEach (name) ->
-            spec = Object.create(specs[name], name: value: name, enumerable: yes)
-            if schema
-                schema.defaults[name] = spec.value
-                schema.specs[name] = spec
-            Object.defineProperty(ob, name, factory(name, spec))
-
-        schema?.names = Object.keys(schema.specs)
-
-
-
-
-
+        else
+            schema = createSchema()
+        schema.update(specs).defineProperties(ob, factory)
 
     class props.spec
         identity = (v) -> v
@@ -146,17 +157,6 @@
                     if spec.required then throw new TypeError(
                         "Missing required property: "+name
                     ) else @[name] = schema.defaults[name]
-
-
-
-
-
-
-
-
-
-
-
 
 
 
