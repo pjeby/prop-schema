@@ -106,7 +106,7 @@ describe "Type and Function Composition", ->
             a.should.have.been.calledOn(ob)
             b.should.have.been.calledOnce
             b.should.have.been.calledOn(ob)
-            
+
 
 
 
@@ -301,26 +301,108 @@ describe "Instance Initialization", ->
             it "using the current implementation"
             it "using the default implementation"
 
+    beforeEach -> @ob = Object.create(Base::)
+
     describe "__setup_storage__", ->
-        it "sets .__props to a copy of .__defaults__"
-        it "makes .__props non-enumerable"
+
+        it "sets .__props to a copy of .__defaults__", ->
+            assign({}, @ob).should.eql {}
+            expect(@ob.__props).to.not.exist
+            @ob.__defaults__ = dflts = {x: 42}
+            @ob.__setup_storage__()
+            expect(@ob.__props).to.eql dflts
+            expect(@ob.__props).to.not.equal dflts
+
+        it "makes .__props non-enumerable", ->
+            @ob.__setup_storage__()
+            Object.keys(@ob).should.eql []
+
+
+
+
+
+
+
+
+
 
     describe "__validate_initializer__", ->
-        it "accepts plain objects"
-        it "accepts instances of the current class"
-        it "rejects unrelated classes"
+
+        it "accepts plain objects", -> withSpy props, 'isPlainObject', (ipo) =>
+            @ob.__validate_initializer__(arg = {})
+            ipo.should.have.been.calledOnce
+            ipo.should.have.been.calledWithExactly(arg)
+
+        it "accepts instances of the current class", ->
+            @ob.constructor = class cls extends Base then constructor: ->
+            @ob.__validate_initializer__(new cls)
+
+        it "rejects unrelated classes", ->
+            (=> @ob.__validate_initializer__(new class))
+            .should.throw TypeError, /must be plain Objects or schema-compatible/
+
         describe "invokes __validate_names__ on plain objects", ->
-            it "using the current implementation"
-            it "using the default implementation"
+
+            it "using the current implementation", ->
+
+                withSpy @ob, '__validate_names__', (vn) =>
+                    @ob.__validate_initializer__(@ob)
+                    vn.should.not.have.been.called
+
+                withSpy @ob, '__validate_names__', (vn) =>
+                    @ob.__validate_initializer__(arg = {})
+                    vn.should.have.been.calledOnce
+                    vn.should.have.been.calledOn(@ob)
+                    vn.should.have.been.calledWithExactly(arg)
+
+            it "using the default implementation", ->
+                @ob = new class
+                withSpy Base::, '__validate_names__', (vn) =>
+                    Base::__validate_initializer__.call(@ob, @ob)
+                    vn.should.not.have.been.called
+
+                withSpy Base::, '__validate_names__', (vn) =>
+                    Base::.__validate_initializer__.call(@ob, arg = {})
+                    vn.should.have.been.calledOnce
+                    vn.should.have.been.calledOn(@ob)
+                    vn.should.have.been.calledWithExactly(arg)
 
     describe "__validate_names__", ->
-        it "rejects objects with enumerable-own properties not in schema"
+
+        it "rejects objects with enumerable-own properties not in schema", ->
+            defineProperties @ob, x: spec(1), null, @ob
+            @ob.__validate_names__(x:2)
+            (=> @ob.__validate_names__(constructor: 99))
+            .should.throw TypeError, "Unknown property: constructor"
 
     describe "__initialize_from__", ->
         it "accepts multiple sources"
         it "uses the first source with a property"
         it "initializes all properties, even if not specified"
         it "throws when a required property is missing"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

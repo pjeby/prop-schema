@@ -81,30 +81,30 @@
 
 
     class props.Base
+
         __prop_desc__: (name, spec) ->
             get: -> @__props[name]
             set: (v) -> @__props[name] = spec.convert(v)
             configurable: yes
             enumerable: yes
 
+        __setup_storage__: ->
+            Object.defineProperty(
+                this, '__props', value: props.assign {}, @__defaults__
+            )
 
+        __validate_initializer__: (arg) ->
+            if props.isPlainObject(arg)
+                (@__validate_names__ ? Base::__validate_names__).call(this, arg)
+            else throw new TypeError(
+                "Arguments must be plain Objects or schema-compatible"
+            ) unless arg instanceof @constructor
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        __validate_names__: (arg) ->
+            schema = @__specs__
+            has = Object::hasOwnProperty
+            for k in Object.keys(arg) when not has.call(schema, k)
+                throw new TypeError "Unknown property: "+k
 
 
 
