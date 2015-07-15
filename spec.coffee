@@ -4,6 +4,8 @@ chai.use require 'sinon-chai'
 
 {spy} = sinon = require 'sinon'
 
+same = sinon.match.same
+
 spy.named = (name, args...) ->
     s = if this is spy then spy(args...) else this
     s.displayName = name
@@ -24,8 +26,6 @@ withSpy = (ob, name, fn) ->
 checkTE = (fn, msg) -> fn.should.throw TypeError, msg
 
 {Environment} = require 'mock-globals'
-
-
 
 
 
@@ -369,85 +369,44 @@ describe "Composed types", ->
 
 describe "Instance Initialization", ->
 
-    beforeEach ->
-        @ob = {}
-        @ob2 = {}
-        defineSchema(@ob, {})
+    beforeEach -> defineSchema(@ob={}, {})
 
     describe "Base.call()", ->
 
-        beforeEach ->
-            defineSchema @ob, y: spec(42), z: spec(99)
-            defineSchema @ob2, y: spec(42), z: spec(99)
+        beforeEach -> defineSchema @ob, y: spec(42), z: spec(99)
 
         it "throws if called without explicit `this`", ->
             (-> Base() ).should.throw TypeError
 
-        it "invokes __schema__.setupStorage(this) before validation", ->
+        it "invokes __schema__.setupStorage(this) first", ->
             withSpy @ob.__schema__, 'setupStorage', (ss) =>
-                withSpy @ob.__schema__, 'propertiesFrom', (init) =>
+                withSpy @ob.__schema__, 'propertiesFrom', (pf) =>
                     Base.call(@ob)
                     ss.should.have.been.calledOnce
-                    ss.should.have.been.calledAfter(init)
-                    ss.should.have.been.calledWithExactly(@ob, init.returnValues[0])
+                    ss.should.have.been.calledBefore(pf)
+                    ss.should.have.been.calledWithExactly(same(@ob))
 
+        it "validates all its arguments w/__schema__.toInitializer()", ->
+            withSpy @ob.__schema__, 'setupStorage', (ss) =>
+                withSpy @ob.__schema__, 'toInitializer', (ti) =>
+                    Base.call(@ob, arg1={}, arg2={})
+                    ti.should.have.been.calledTwice
+                    ti.should.have.been.always.calledAfter(ss)
+                    ti.should.have.been.calledWithExactly(same(arg1))
+                    ti.should.have.been.calledWithExactly(same(arg2))
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        describe "validates all its arguments w/__schema__.toInitializer()", ->
-
-            checkVI = (ob, impl=ob) ->
-                withSpy ob.__schema__, 'setupStorage', (ss) =>
-                    withSpy ob.__schema__, 'toInitializer', (ti) =>
-                        Base.call(ob, arg1={}, arg2={})
-                        ti.should.have.been.calledTwice
-                        ti.should.have.been.always.calledBefore(ss)
-                        ti.should.have.been.calledWithExactly(arg1)
-                        ti.should.have.been.calledWithExactly(arg2)
-
-            it "using the current implementation", -> checkVI(@ob)
-            it "using the default implementation", -> checkVI(@ob2, Base::)
-
-
-        describe "calls propertiesFrom() first", ->
-
-            checkInit= (ob, impl=ob) ->
-                withSpy ob.__schema__, 'setupStorage', (ss) =>
-                    withSpy ob.__schema__, 'toInitializer', (ti) =>
-                        withSpy ob.__schema__, 'propertiesFrom', (init) =>
-                            Base.call(ob, arg={})
-                            init.should.have.been.calledOnce
-                            #init.should.have.been.calledOn(ob)
-                            init.should.have.been.calledWithExactly(arg)
-                            init.should.have.been.calledBefore(ss)
-                            init.should.have.been.calledBefore(ti)
-
-            it "using the current implementation", -> checkInit(@ob)
-            it "using the default implementation", -> checkInit(@ob2, Base::)
-
-
-
-
-
-
-
-
-
-
+        it "assigns this from __schema__.propertiesFrom()", ->
+            withSpy @ob.__schema__, 'setupStorage', (ss) =>
+                withSpy @ob.__schema__, 'toInitializer', (ti) =>
+                    withSpy @ob.__schema__, 'propertiesFrom', (pf) =>
+                        withSpy props, 'assign', (a) =>
+                            Base.call(@ob, arg={})
+                            pf.should.have.been.calledOnce
+                            pf.should.have.been.calledWithExactly(same(arg))
+                            pf.should.have.been.calledAfter(ss)
+                            pf.should.have.been.calledBefore(ti)
+                            pf.should.have.been.calledBefore(a)
+                            a.should.have.been.calledWithExactly(same(@ob), same(pf.returnValues[0]))
 
     describe "__schema__.setupStorage(ob)", ->
 
@@ -469,7 +428,7 @@ describe "Instance Initialization", ->
             withSpy props, 'isPlainObject', (ipo) =>
                 expect(@ob.__schema__.toInitializer(arg = {})).to.equal arg
                 ipo.should.have.been.calledOnce
-                ipo.should.have.been.calledWithExactly(arg)
+                ipo.should.have.been.calledWithExactly(same(arg))
 
         it "accepts objecsts with overlapping schema", ->
             defineSchema(@ob, y: spec(42), z: spec(99)).setupStorage(@ob)
@@ -488,7 +447,7 @@ describe "Instance Initialization", ->
             withSpy @ob.__schema__, 'validateNames', (vn) =>
                 @ob.__schema__.toInitializer(arg = {})
                 vn.should.have.been.calledOnce
-                vn.should.have.been.calledWithExactly(arg)
+                vn.should.have.been.calledWithExactly(same(arg))
 
     describe "__schema__.validateNames", ->
 
@@ -598,7 +557,7 @@ describe "Utilities", ->
             withSpy schema, 'descriptorFor', (df) ->
                 schema.defineProperties(ob = {})
                 df.should.have.been.calledOnce
-                df.should.have.been.calledWith('x')
+                df.should.have.been.calledWithExactly('x', same(schema.specs['x']))
 
 
 
@@ -654,7 +613,6 @@ describe "Utilities", ->
 
 
 
-
 describe "props(specs)", ->
 
     it "returns a new subclass of props.Base", ->
@@ -665,7 +623,7 @@ describe "props(specs)", ->
         withSpy props, 'defineSchema', (ds) ->
             cls = props(specs={})
             ds.should.have.been.calledOnce
-            ds.should.have.been.calledWith(cls::, specs)
+            ds.should.have.been.calledWith(same(cls::), same(specs))
 
 
 describe "props(cls, specs)", ->
@@ -674,7 +632,7 @@ describe "props(cls, specs)", ->
         withSpy props, 'defineSchema', (ds) ->
             props(class cls, specs={})
             ds.should.have.been.calledOnce
-            ds.should.have.been.calledWith(cls::, specs)
+            ds.should.have.been.calledWith(same(cls::), same(specs))
 
 
 describe "props.defineSchema(proto, specs)", ->

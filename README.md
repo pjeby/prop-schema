@@ -385,7 +385,7 @@ These behaviors are all controlled by the following `__schema__` methods, which 
 
 By default, the values of schema-based properties are stored in a non-enumerable `__props` property on an object, but you can change this by supplying *both* of the following extensions when creating your schema:
 
-* `.setupStorage(ob, values?)` -- Set up property storage for `ob`, optionally initializing them using `values`.  The default creates a non-enumerable `__props` property on `ob` for storing property values, containing a copy of the schema `.defaults`, and then setting any properties contained in `values`.  (This method is called by the `props.Base` constructor, passing in `.propertiesFrom(arguments...)`.)
+* `.setupStorage(ob)` -- Set up property storage for `ob`.  The default creates a non-enumerable `__props` property on `ob` for storing property values, containing a copy of the schema `.defaults`.  (This method is called by the `props.Base` constructor, before it initializes property values from `.propertiesFrom(arguments...)`.)
 
 * `.descriptorFor(name, spec)` -- Return an ES5 property descriptor for the given property name and specifier.  The default returns something like:
 

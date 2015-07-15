@@ -94,9 +94,9 @@
             configurable: yes
             enumerable: yes
 
-        setupStorage: (ob, values = @defaults) ->
-            Object.defineProperty(ob, '__props', value: props.assign({},values))
-            props.assign(ob, values)
+        setupStorage: (ob) -> Object.defineProperty(
+            ob, '__props', value: props.assign {}, @defaults
+        )
 
         toInitializer: (ob) ->
             if not (other = ob?.__schema__)?
@@ -155,9 +155,9 @@
         constructor: ->
             if not this? or this is defaultThis
                 throw new TypeError("Must create with new")
-            else @__schema__.setupStorage(
-                this, @__schema__.propertiesFrom(arguments...)
-            )
+            @__schema__.setupStorage(this)
+            props.assign(this, @__schema__.propertiesFrom(arguments...))
+
 
 
 
