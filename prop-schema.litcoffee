@@ -139,7 +139,7 @@
             for name in @__names__
                 spec = @__specs__[name]
                 for arg in arguments
-                    if got = has.call(arg, name)
+                    if got = name of arg # XXX has.call(arg, name)
                         @[name] = arg[name]; break
                 unless got
                     if spec.required then throw new TypeError(

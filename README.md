@@ -52,19 +52,19 @@ Report.prototype.run = function () {
 
 // The class prototype is automatically annotated with useful schema
 // information you can use to generate help listings, db schemas, etc.
-Report.prototype.__names__ // => ['sql', 'cols', 'title']
-Report.prototype.__defaults__ // => [null, 80, '']
+Report.prototype.__names__ // => [ 'sql', 'cols', 'title' ]
+Report.prototype.__defaults__ // => { sql: null, cols: 80, title: '' }
 Report.prototype.__specs__['title'].doc // => 'Report title'
-Report.prototype.__specs__['sql'].meta // => {required: true}
+Report.prototype.__specs__['sql'].meta // => { required: true }
 
 // Required properties must be listed somewhere in the arguments; the default
 // value isn't used:
-new Report() 
+new Report()
 // => TypeError: Missing required property: sql
 
 // Instances are created with immediate validation
 new Report("foo") 
-// => TypeError: Arguments must be plain Objects or be schema-compatible 
+// => TypeError: Arguments must be plain Objects or schema-compatible 
 
 // Unrecognized property names get an error by default
 new Report({sequel:"z"}) // => TypeError: Unknown property: sequel
@@ -78,15 +78,15 @@ new Report({sql: "Z", cols: 0}) // => TypeError: cols must be > 0
 
 // Property enumeration follows schema order, not argument order
 var r1 = new Report({title: "Hello", sql:"X"}) 
-// => {sql: "X", cols: 80, title: "Hello"}
+r1.__props // => { sql: "X", cols: 80, title: "Hello" }
 
 // Multiple arguments can be passed in order to combine/inherit properties
 var r2 = new Report({cols:20}, r1)
-// => {sql: "X", cols: 20, title: "Hello"}
+r2.__props // => { sql: "X", cols: 20, title: "Hello" }
 
 // Earlier arguments' values override later ones
 var r3 = new Report({title: "Yo!!"}, {cols:5}, r2, {sql: "WHAT?"})
-// => {sql: "X", cols: 5, title: "Yo!!"}
+r3.__props // => { sql: "X", cols: 5, title: "Yo!!" }
 
 
 // Custom property types can be created, and can use custom metadata as part of

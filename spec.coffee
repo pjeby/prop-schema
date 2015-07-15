@@ -23,6 +23,88 @@ withSpy = (ob, name, fn) ->
 
 checkTE = (fn, msg) -> fn.should.throw TypeError, msg
 
+{Environment} = require 'mock-globals'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+describe "Examples", ->
+
+    before ->
+
+        @env = new Environment({props})
+        @run = (code, output) ->
+            res = @env.run(code)
+            @env.getOutput().should.equal output if output?
+            return res
+
+    afterEach -> @env.getOutput()   # clear state
+
+    describe "Report class", ->
+        before -> @run """
+        Report = props({
+          sql: props.string(null, "sql to run", {required: true}),
+          cols: props.integer.and(props.positive)(80, "Report width in columns"),
+          title: props.string("", "Report title", function(value) {
+            if (value.length < 4)
+              throw new TypeError(this.name + " must be at least 4 chars");
+            else return value;
+          }),
+        }); undefined"""
+
+        it "Should have schema info", ->
+            @run("Report.prototype.__names__", "[ 'sql', 'cols', 'title' ]\n")
+            @run("Report.prototype.__defaults__",
+               "{ sql: null, cols: 80, title: '' }\n")
+            @run("Report.prototype.__specs__['title'].doc",
+                "'Report title'\n")
+            @run("Report.prototype.__specs__['sql'].meta",
+                "{ required: true }\n")
+
+        it "Should expect required properties", ->
+            checkTE (=> @run "new Report()"), "Missing required property: sql"
+
+        it "Should require Object arguments", ->
+            checkTE (=> @run "new Report('foo')"),
+                "Arguments must be plain Objects or schema-compatible"
+
+
+        it "Should reject invalid property names", ->
+            checkTE (=> @run 'new Report({sequel:"z"})'),
+                "Unknown property: sequel"
+
+        it "Even default values are subject to validation", ->
+            checkTE (=> @run 'new Report({sql:"X"})'),
+                "title must be at least 4 chars"
+
+        it "Each combined type supplies its own error messages", ->
+            checkTE (=> @run('new Report({sql: "Z", cols: 0.1})')),
+                "cols must be an integer"
+            checkTE (=> @run('new Report({sql: "Z", cols: 0})')),
+                "cols must be > 0"
+        it "Property enumeration follows schema order, not argument order", ->
+            @run('r1 = new Report({title: "Hello", sql:"X"}); r1.__props',
+                "{ sql: 'X', cols: 80, title: 'Hello' }\n")
+
+        it "Multiple arguments can be passed to combine properties", ->
+            @run('r2 = new Report({cols:20}, r1); r2.__props',
+                "{ sql: 'X', cols: 20, title: 'Hello' }\n")
+
+        it "Earlier arguments' values override later ones", ->
+            @run("""var r3 = new Report(
+                    {title: "Yo!!"}, {cols:5}, r2, {sql: "WHAT?"}
+                  ); r3.__props""", "{ sql: 'X', cols: 5, title: 'Yo!!' }\n")
 
 
 

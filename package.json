@@ -29,7 +29,8 @@
     "mocha": "^1.18.2",
     "chai": "^1.9.1",
     "sinon": "^1.9.1",
-    "sinon-chai": "^2.5.0"
+    "sinon-chai": "^2.5.0",
+    "mock-globals": "^0.1.0"
   },
   "dependencies": {
     "normalize-arguments": "^1.2.0"
