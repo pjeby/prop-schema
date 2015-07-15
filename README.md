@@ -72,10 +72,12 @@ Report.prototype.run = function () {
 
 // The class prototype is automatically annotated with useful schema
 // information you can use to generate help listings, db schemas, etc.
-Report.prototype.__names__ // => [ 'sql', 'cols', 'title' ]
-Report.prototype.__defaults__ // => { sql: null, cols: 80, title: '' }
-Report.prototype.__specs__['title'].doc // => 'Report title'
-Report.prototype.__specs__['sql'].meta // => { required: true }
+
+var schemaInfo = Report.prototype.__schema__;
+schemaInfo.names // => [ 'sql', 'cols', 'title' ]
+schemaInfo.defaults // => { sql: null, cols: 80, title: '' }
+schemaInfo.specs['title'].doc // => 'Report title'
+schemaInfo.specs['sql'].meta // => { required: true }
 
 // Required properties must be listed somewhere in the arguments; the default
 // value isn't used:
@@ -211,7 +213,7 @@ As you can see, `prop-schema` is not dependent on any particular inheritance imp
 
 By default, the actual property values of an instance of a schema-controlled class are stored in its `.__props` property, and the property descriptors themselves are inherited from the class's prototype.  This works fine for code that is accessing properties by name or looping over all enumerable properties, but it does not work for `JSON.stringify()`, `util.inspect()`, or other things that only enumerate over own-properties.
 
-This can easily be worked around by calling `props.defineProperties(this, this.__specs__)` in your class's constructor, to forcibly add the descriptors to each instance.  The trade-off is a reduction in speed of property access, and increased storage space per instance, so it is not done by default.  There is also no way to undo it once it has been done to a given instance.  (Also, it's only a partial fix for `util.inspect()`, which will display all property values as `[Getter/Setter]` instead of their actual values.)
+This can easily be worked around by calling `props.defineProperties(this, this.__schema__.specs)` in your class's constructor, to forcibly add the descriptors to each instance.  The trade-off is a reduction in speed of property access, and increased storage space per instance, so it is not done by default.  There is also no way to undo it once it has been done to a given instance.  (Also, it's only a partial fix for `util.inspect()`, which will display all property values as `[Getter/Setter]` instead of their actual values.)
 
 Of course, if you want to avoid the performance cost, and only need to support `JSON.stringify()` or `util.inspect()`, you can always define a `.toJSON()` method that returns `.__props`, and/or a similar method for `.inspect()`.  (Which then works around the `Getter/Setter]` limitation.)
 
@@ -227,13 +229,13 @@ The schema you pass to `props()` is a plain object mapping property names to **p
 * `.meta` -- a plain object containing arbitrary metadata.  If it contains `required: true`, then the property is required and must be explicitly given in a data source passed to `props.Base` in the class's constructor.
 * `.convert(value)` -- a method that validates and/or converts an input value to the correct type, or throws an error if the value is invalid
 
-When you create or update a class's schema using `props()`, it updates schema information in three special properties on a class's prototype:
+When you create or update a class's schema using `props()`, it updates schema information in a `__schema__` property on the class's prototype.  The `__schema__` includes the following properties:
 
-* `__names__` -- the names of the properties in the class's schema, as an array
-* `__defaults__` -- an object mapping property names to default values
-* `__specs__` -- an object mapping property names to their property specifiers
+* `names` -- the names of the properties in the class's schema, as an array
+* `defaults` -- an object mapping property names to default values
+* `specs` -- an object mapping property names to their property specifiers
 
-Using the property specifiers in `YourClass.prototype.__specs__`, you can access their `.doc`, `.meta`, and other properties to help you generate help messages, command-line parsers, database schemas, etc.
+Using the property specifiers in `YourClass.prototype.__schema__.specs` (or `yourObject.__schema__.specs`), you can access their `.doc`, `.meta`, and other properties to help you generate help messages, command-line parsers, database schemas, etc.
 
 But first, you need to actually create some property specifiers, using `props.spec()` or type expressions.
 
@@ -436,4 +438,4 @@ For your convenience, `prop-schema` exposes a few of its internally-used utility
 
 * `props.compose(typeOrFunction, ...)` -- similar to `props.type()`, except that it returns a converter/validator function instead of a property type.  That is, the returned function takes a value and returns a converted value or throws an error.  It does *not* have `.or()` or `.and()` methods, nor can it be used as shorthand to specify properties.  You will probably never need this function unless you are creating your own type composition functions, or wish to turn a type back into a converter/validator function.  (i.e. `props.compose(aType)` converts `aType` back to a plain converter/validator function.)
 
-* `props.defineProperties(ob, schema, factory?, prototype?)` -- define properties on `ob` according to `schema`, calling `factory(name, spec)` to generate the property descriptors.  If no `factory` is supplied, `ob.__prop_desc__` is used, or the default implementation if `ob` doesn't have a `__prop_desc__()` method.  If `prototype` is supplied, its `__specs__`, `__defaults__`, and `__names__` properties are created or updated, as appropriate.  This is basically the internal implementation of the `props()` function, minus syntax sugar.  It's exposed so you can do things like, say, create a proxy object that loads its data from a database on first access, and then redefines all its properties again to refer to stored values.
+* `props.defineProperties(ob, schema, factory?, prototype?)` -- define properties on `ob` according to `schema`, calling `factory(name, spec)` to generate the property descriptors.  If no `factory` is supplied, `ob.__prop_desc__` is used, or the default implementation if `ob` doesn't have a `__prop_desc__()` method.  If `prototype` is supplied, the `specs`, `defaults`, and `names` of its `__schema__` property are created or updated, as appropriate.  This is basically the internal implementation of the `props()` function, minus syntax sugar.  It's exposed so you can do things like, say, create a proxy object that loads its data from a database on first access, and then redefines all its properties again to refer to stored values.

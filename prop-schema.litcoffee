@@ -56,26 +56,26 @@
     props.nonNegative = props.number.and props.check "must be >= 0",
         (v) -> v >= 0
 
-    props.defineProperties = (ob, schema, factory, proto) ->
+    props.defineProperties = (ob, specs, factory, proto) ->
         if proto
-            Object.defineProperties(proto,
-                __defaults__: value: props.assign {}, proto.__defaults__
-                __specs__: value: props.assign {}, proto.__specs__
-                __names__: value: []
-            ) unless proto.hasOwnProperty('__defaults__')
-            defaults = proto.__defaults__
-            specs = proto.__specs__
-            names = proto.__names__
+            unless proto.hasOwnProperty('__schema__')
+                schema = Object.create(proto.__schema__ ? {})
+                schema.specs = props.assign {}, schema.specs
+                schema.defaults = props.assign {}, schema.defaults
+                Object.defineProperty(proto, '__schema__', value: schema)
+            schema = proto.__schema__
 
         factory ?= ob.__prop_desc__ ? props.Base::__prop_desc__
-        Object.keys(schema).forEach (name) ->
-            spec = Object.create(schema[name], name: value: name, enumerable: yes)
-            if proto
-                defaults[name] = spec.value
-                specs[name] = spec
+        Object.keys(specs).forEach (name) ->
+            spec = Object.create(specs[name], name: value: name, enumerable: yes)
+            if schema
+                schema.defaults[name] = spec.value
+                schema.specs[name] = spec
             Object.defineProperty(ob, name, factory(name, spec))
 
-        names?.splice(0, names.length, Object.keys(defaults)...)
+        schema?.names = Object.keys(schema.specs)
+
+
 
 
 
@@ -118,7 +118,7 @@
 
         __setup_storage__: ->
             Object.defineProperty(
-                this, '__props', value: props.assign {}, @__defaults__
+                this, '__props', value: props.assign {}, @__schema__.defaults
             )
 
         __validate_initializer__: (arg) ->
@@ -131,21 +131,21 @@
         has = Object::hasOwnProperty
 
         __validate_names__: (arg) ->
-            schema = @__specs__
+            schema = @__schema__.specs
             for k in Object.keys(arg) when not has.call(schema, k)
                 throw new TypeError "Unknown property: "+k
 
         __initialize_from__: ->
-            for name in @__names__
-                spec = @__specs__[name]
+            schema = @__schema__
+            for name in schema.names
+                spec = schema.specs[name]
                 for arg in arguments
                     if got = name of arg # XXX has.call(arg, name)
                         @[name] = arg[name]; break
                 unless got
                     if spec.required then throw new TypeError(
                         "Missing required property: "+name
-                    ) else @[name] = @__defaults__[name]
-
+                    ) else @[name] = schema.defaults[name]
 
 
 
