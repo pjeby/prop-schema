@@ -21,7 +21,7 @@ withSpy = (ob, name, fn) ->
     s = spy.named name, ob, name
     try fn(s) finally s.restore()
 
-
+checkTE = (fn, msg) -> fn.should.throw TypeError, msg
 
 
 
@@ -82,11 +82,15 @@ describe "Type and Function Composition", ->
 
     describe "type(a).and(b)", ->
 
-        it "returns type(a, b)", -> withSpy props, 'type', (t) ->
-            ret = type(a=->).and(b=->)
-            t.should.have.been.calledOnce
-            t.should.have.been.calledWithExactly(a, b)
-            t.should.have.returned(ret)
+        it "returns type(a, b)", ->
+            withSpy props, 'type', (t) -> withSpy props, 'compose', (c) ->
+                ret = type(a=->).and(b=->)
+                t.should.have.been.calledOnce
+                t.should.have.been.calledWithExactly(a, b)
+                t.should.have.returned(ret)
+                c.should.have.returned(ret.converter)
+                c.should.have.been.calledWithExactly(a, b)
+
 
     describe "type(a).or(b)(val)", ->
 
@@ -106,10 +110,6 @@ describe "Type and Function Composition", ->
             a.should.have.been.calledOn(ob)
             b.should.have.been.calledOnce
             b.should.have.been.calledOn(ob)
-
-
-
-
 
 
 
@@ -214,34 +214,47 @@ describe "Basic types", ->
                         expect(-> t.converter.call(name: kk, vv))
                         .to.throw(TypeError, ///#{kk}\ must\ be\ a\ #{k}///)
 
+
 describe "Composed types", ->
 
+    beforeEach ->
+        @shouldFail = (val, msg) -> checkTE (=> @ps.convert(val)), msg
+        @shouldOK = (val, out) -> expect(@ps.convert(val)).to.equal(out)
+
     describe ".empty", ->
-        it "accepts null"
-        it "accepts undefined"
-        it "rejects anything else"
+        beforeEach -> @ps = props.empty(21); @ps.name = 'x'
+        it "accepts null",      -> @shouldOK null, null
+        it "accepts undefined", -> @shouldOK undefined, undefined
+        it "rejects anything else", ->
+            @shouldFail 42, "x must be null or undefined"
 
     describe ".object", ->
-        it "rejects non-plain objects"
-        it "clones its values"
+        beforeEach -> @ps = props.object(null); @ps.name = 'x'
+
+        it "rejects non-plain objects", ->
+            @shouldFail 42, "x must be a plain Object"
+
+        it "clones its values", ->
+            res = @ps.convert(ob={x:1})
+            res.should.not.equal(ob); res.should.eql ob
 
     describe ".integer", ->
-        it "rejects non-numbers and non-integer floating point"
+        it "rejects non-numbers and non-integer floating point", ->
+            ps = props.integer(null); ps.name = 'x'
+            checkTE (-> ps.convert("42")), "x must be a number"
+            checkTE (-> ps.convert(0.1)), "x must be an integer"
 
     describe ".positive", ->
-        it "rejects non-numbers"
-        it "rejects numbers less than 1"
+        beforeEach -> @ps = props.positive(null); @ps.name = 'x'
+        it "rejects non-numbers", -> @shouldFail "42", "x must be a number"
+        it "rejects numbers <= 0", -> @shouldFail 0, "x must be > 0"
+        it "accepts numbers > 0", -> @shouldOK(1, 1)
 
     describe "nonNegative", ->
-        it "rejects non-numbers"
-        it "rejects numbers less than 0"
-
-
-
-
-
-
-
+        beforeEach -> @ps = props.nonNegative(null); @ps.name = 'x'
+        it "rejects non-numbers", -> @shouldFail "42", "x must be a number"
+        it "rejects numbers < 0", -> @shouldFail -1, "x must be >= 0"
+        it "accepts numbers >= 0", -> @shouldOK(1, 1)
 
 
 describe "props(cls, schema)", ->
@@ -253,7 +266,6 @@ describe "props(cls, schema)", ->
             dp.should.have.been.calledWithExactly(
                 cls::, schema, undefined, cls::
             )
-
 
 describe "props(schema)", ->
 
@@ -268,18 +280,6 @@ describe "props(schema)", ->
             dp.should.have.been.calledWithExactly(
                 cls::, schema, undefined, cls::
             )
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

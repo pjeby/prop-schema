@@ -24,20 +24,16 @@
         g = props.compose(rest...)
         (v) -> f.call(this, g.call(this, v))
 
-    props.type = (f) ->
-        factory = ->
-            [val, doc, meta, rest...] = args(arguments, [
-             args.any, args.string(""), args.object({})
-            ])
-            return new props.spec(val, doc, meta, f, rest...)
-        factory.converter = props.compose(f)
+    props.type = ->
+        factory = (val, rest...)->
+            [doc, meta, rest...] = args(rest, [args.string(""), args.object({})])
+            return new props.spec(val, doc, meta, factory.converter, rest...)
+        factory.converter = f = props.compose(arguments...)
         factory.and = (g) -> props.type(f, g)
         factory.or = (g) ->
             g = props.compose(g)
             props.type (v) -> try f.call(this, v) catch e then g.call(this, v)
         return factory
-
-
 
     props.check = (message, filter) -> props.type (val) ->
         throw new TypeError @name+" "+message unless filter?(val)
@@ -45,6 +41,20 @@
 
     ['number', 'string', 'function', 'boolean'].forEach (t) ->
         props[t] = props.check "must be a "+t, (v) -> typeof v is t
+
+    props.empty = props.check("must be null or undefined", (v) -> not v?)
+
+    props.object = props.type (val) ->
+        return props.assign({}, val) if props.isPlainObject(val)
+        throw new TypeError "#{@name} must be a plain Object"
+
+    props.integer = props.number.and props.check "must be an integer",
+        (v) -> v == ~~v
+
+    props.positive = props.number.and props.check "must be > 0", (v) -> v > 0
+
+    props.nonNegative = props.number.and props.check "must be >= 0",
+        (v) -> v >= 0
 
     props.defineProperties = (ob, schema, factory, proto) ->
         if proto
@@ -67,17 +77,19 @@
 
         names?.splice(0, names.length, Object.keys(defaults)...)
 
+
+
+
     class props.spec
         identity = (v) -> v
-        constructor: () ->
+
+        constructor: (val, rest...) ->
             return new spec(arguments...) unless this instanceof spec
-            [@value, @doc, meta, rest...] = args(arguments, [
-             args.any, args.string(""), args.object({})
-            ])
+            @value = val
+            [@doc, meta, rest...] = args(rest, [args.string(""), args.object()])
             @meta = props.assign {}, meta
             @required = @meta.required ? no
             @convert = if rest.length then props.compose(rest...) else identity
-
 
 
     class props.Base
@@ -116,11 +128,6 @@
                 "Arguments must be plain Objects or schema-compatible"
             ) unless arg instanceof @constructor
 
-
-
-
-
-
         has = Object::hasOwnProperty
 
         __validate_names__: (arg) ->
@@ -138,13 +145,6 @@
                     if spec.required then throw new TypeError(
                         "Missing required property: "+name
                     ) else @[name] = @__defaults__[name]
-
-
-
-
-
-
-
 
 
 
