@@ -2,10 +2,10 @@
 
     args = require 'normalize-arguments'
 
-    module.exports = props = (cls, schema) ->
-        [cls, schema] = args(arguments, [args.fn(), args.object({})])
+    module.exports = props = (cls, specs) ->
+        [cls, specs] = args(arguments, [args.fn(), args.object({})])
         cls ?= class extends props.Base
-        props.defineProperties(cls::, schema, undefined, cls::)
+        props.defineSchema(cls::, specs)
         cls
 
     props.isPlainObject = (val) ->
@@ -63,7 +63,7 @@
         return schema
 
     defaultSchema =
-        update: (specs) ->
+        __update: (specs) ->
             for name in Object.keys(specs)
                 @specs[name] = spec = Object.create(
                     specs[name], name: value: name, enumerable: yes
@@ -76,20 +76,17 @@
             factory ?= ob.__prop_desc__ ? props.Base::__prop_desc__
             for name in @names
                 Object.defineProperty(ob, name, factory(name, @specs[name]))
+            return ob
 
 
 
-
-    props.defineProperties = (ob, specs, factory, proto) ->
-        if proto
-            unless proto.hasOwnProperty('__schema__')
-                Object.defineProperty(
-                    proto, '__schema__', value: createSchema(proto.__schema__)
-                )
-            schema = proto.__schema__
-        else
-            schema = createSchema()
-        schema.update(specs).defineProperties(ob, factory)
+    props.defineSchema = (proto, specs, factory) ->
+        unless proto.hasOwnProperty('__schema__')
+            Object.defineProperty(
+                proto, '__schema__', value: createSchema(proto.__schema__)
+            )
+        proto.__schema__.__update(specs).defineProperties(proto, factory)
+        return proto.__schema__
 
     class props.spec
         identity = (v) -> v
@@ -102,14 +99,11 @@
             @required = @meta.required ? no
             @convert = if rest.length then props.compose(rest...) else identity
 
-
     class props.Base
-
         getter = (name) ->
             -> (@[name] ? Base::[name]).apply(this, arguments)
 
         defaultThis = do -> this
-
         setupStorage = getter('__setup_storage__')
         validateNames = getter('__validate_names__')
         validateInitiaizer = getter('__validate_initializer__')
@@ -157,6 +151,12 @@
                     if spec.required then throw new TypeError(
                         "Missing required property: "+name
                     ) else @[name] = schema.defaults[name]
+
+
+
+
+
+
 
 
 

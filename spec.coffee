@@ -10,7 +10,7 @@ spy.named = (name, args...) ->
     return s
 
 {
-    Base, spec, assign, isPlainObject, type, compose, check, defineProperties
+    Base, spec, assign, isPlainObject, type, compose, check, defineSchema
 } = props = require './'
 
 util = require 'util'
@@ -107,7 +107,7 @@ describe "Examples", ->
                   ); r3.__props""", "{ sql: 'X', cols: 5, title: 'Yo!!' }\n")
 
         it "JSON works when props are defined", ->
-            @run("props.defineProperties(r1, r1.__schema__.specs); JSON.stringify(r1)"
+            @run("r1.__schema__.defineProperties(r1); JSON.stringify(r1)"
             ).should.equal '{"sql":"X","cols":80,"title":"Hello"}'
 
 
@@ -372,13 +372,13 @@ describe "Instance Initialization", ->
     beforeEach ->
         @ob = Object.create(Base::)
         @ob2 = {}
-        defineProperties(@ob, {}, null, @ob)
+        defineSchema(@ob, {})
 
     describe "Base.call()", ->
 
         beforeEach ->
-            defineProperties @ob, y: spec(42), z: spec(99), null, @ob
-            defineProperties @ob2, y: spec(42), z: spec(99), null, @ob2
+            defineSchema @ob, y: spec(42), z: spec(99)
+            defineSchema @ob2, y: spec(42), z: spec(99)
 
         it "throws if called without explicit `this`", ->
             (-> Base() ).should.throw TypeError
@@ -508,7 +508,7 @@ describe "Instance Initialization", ->
 
             it "using the default implementation", ->
                 cls = class
-                defineProperties(cls::, {}, null, cls::)
+                defineSchema(cls::, {})
                 checkValidate(new cls, Base::)
 
 
@@ -534,7 +534,7 @@ describe "Instance Initialization", ->
     describe "__validate_names__", ->
 
         it "rejects objects with enumerable-own properties not in schema", ->
-            defineProperties @ob, x: spec(1), null, @ob
+            defineSchema @ob, x: spec(1)
             @ob.__validate_names__(x:2)
             (=> @ob.__validate_names__(constructor: 99))
             .should.throw TypeError, "Unknown property: constructor"
@@ -543,7 +543,7 @@ describe "Instance Initialization", ->
     describe "__initialize_from__", ->
 
         beforeEach ->
-            defineProperties @ob, y: spec(42), z: spec(99), null, @ob
+            defineSchema @ob, y: spec(42), z: spec(99)
             @ob.__props = {}
 
         it "accepts multiple sources", ->
@@ -559,7 +559,7 @@ describe "Instance Initialization", ->
             @ob.__props.should.eql {y: 42, z: 15}
 
         it "throws when a required property is missing", ->
-            defineProperties @ob, z: spec(0, required: yes), null, @ob
+            defineSchema @ob, z: spec(0, required: yes)
             (=> @ob.__initialize_from__({x:1}, {y:2}))
             .should.throw TypeError, "Missing required property: z"
 
@@ -615,11 +615,11 @@ describe "Utilities", ->
 
     describe "schema.defineProperties(ob)", ->
 
-        schema = x: spec(42, parseInt)
+        schema = props(x: spec(42, parseInt))::__schema__
 
         describe "creates descriptors that", ->
 
-            beforeEach -> defineProperties(@ob={}, schema)
+            beforeEach -> schema.defineProperties(@ob={})
 
             it "are enumerable and configurable", ->
                 desc = Object.getOwnPropertyDescriptor(@ob, 'x')
@@ -637,13 +637,13 @@ describe "Utilities", ->
 
         it "uses props.Base::__prop_desc__ as a default factory", ->
             withSpy Base.prototype, '__prop_desc__', (s) ->
-                defineProperties(ob = {}, schema)
+                schema.defineProperties(ob = {})
                 s.should.have.been.calledOnce
                 s.should.have.been.calledWith('x')
 
         it "uses ob.__prop_desc__ as a factory if available", ->
             ob = __prop_desc__: s = spy (name, ps) -> value: ps
-            defineProperties(ob, schema)
+            schema.defineProperties(ob)
             s.should.have.been.calledOnce
             s.should.have.been.calledWith('x')
 
@@ -659,10 +659,12 @@ describe "Utilities", ->
         describe "invokes factory(name, spec) for each schema item", ->
 
             beforeEach ->
-                schema = b: spec("b"), c: spec("c"), a: spec("a")
+                schema = props(
+                    b: spec("b"), c: spec("c"), a: spec("a")
+                )::__schema__
                 @results = []
                 my = this
-                defineProperties @ob={}, schema, @factory = (name, ps) ->
+                schema.defineProperties @ob={}, @factory = (name, ps) ->
                     my.results.push name
                     value: ps
 
@@ -693,31 +695,29 @@ describe "Utilities", ->
 
 
 
-
-
 describe "props(specs)", ->
 
     it "returns a new subclass of props.Base", ->
         cls = props(schema={})
         expect(Object.getPrototypeOf(cls::)).to.equal Base::
 
-    it "-> defineProperties(cls.prototype, schema, undefined, cls.prototype)", ->
-        withSpy props, 'defineProperties', (dp) ->
-            cls = props(schema={})
-            dp.should.have.been.calledOnce
-            dp.should.have.been.calledWithExactly(
-                cls::, schema, undefined, cls::
-            )
+    it "-> defineSchema(cls.prototype, specs)", ->
+        withSpy props, 'defineSchema', (ds) ->
+            cls = props(specs={})
+            ds.should.have.been.calledOnce
+            ds.should.have.been.calledWithExactly(cls::, specs)
+
 
 describe "props(cls, specs)", ->
 
-        it "-> defineProperties(cls.prototype, schema, undefined, cls.prototype)", ->
-            withSpy props, 'defineProperties', (dp) ->
-                props(class cls, schema={})
-                dp.should.have.been.calledOnce
-                dp.should.have.been.calledWithExactly(
-                    cls::, schema, undefined, cls::
-                )
+    it "-> defineSchema(cls.prototype, specs)", ->
+        withSpy props, 'defineSchema', (ds) ->
+            props(class cls, specs={})
+            ds.should.have.been.calledOnce
+            ds.should.have.been.calledWithExactly(cls::, specs)
+
+
+describe "props.defineSchema(proto, specs)", ->
 
         expectNamedSpec = (spec, name, base, message) ->
             expect(spec.name).to.equal(name, message+": bad name")
@@ -729,7 +729,7 @@ describe "props(cls, specs)", ->
         schema2 = a: spec("A"), d: spec("D"), b: spec ("B")
 
         beforeEach ->
-            defineProperties(@ob={}, schema1, null, @proto={})
+            defineSchema(@proto={}, schema1)
 
 
 
@@ -754,7 +754,7 @@ describe "props(cls, specs)", ->
 
         describe "updates __schema__ with", ->
 
-            beforeEach -> defineProperties(@ob, schema2, null, @proto)
+            beforeEach -> defineSchema(@proto, schema2)
 
             it ".specs", ->
                 specs = @proto.__schema__.specs
@@ -781,7 +781,7 @@ describe "props(cls, specs)", ->
 
             beforeEach ->
                 @proto2=Object.create(@proto)
-                defineProperties(@ob, schema2, null, @proto2)
+                defineSchema(@proto2, schema2)
 
             it ".specs", ->
                 specs = @proto2.__schema__.specs
