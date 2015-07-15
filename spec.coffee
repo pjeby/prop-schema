@@ -287,21 +287,85 @@ describe "props(schema)", ->
 
 describe "Instance Initialization", ->
 
+    beforeEach ->
+        @ob = Object.create(Base::)
+        @ob2 = {}
+
     describe "Base.call()", ->
-        it "throws if called without explicit `this`"
+
+        beforeEach ->
+            defineProperties @ob, y: spec(42), z: spec(99), null, @ob
+            defineProperties @ob2, y: spec(42), z: spec(99), null, @ob2
+
+        it "throws if called without explicit `this`", ->
+            (-> Base() ).should.throw TypeError
+
         describe "invokes __setup_storage__ before validation", ->
-            it "using the current implementation"
-            it "using the default implementation"
+            checkStorage = (ob, impl=ob) ->
+                withSpy impl, '__setup_storage__', (ss) =>
+                    withSpy impl, '__initialize_from__', (init) =>
+                        Base.call(ob)
+                        ss.should.have.been.calledOnce
+                        ss.should.have.been.calledOn(ob)
+                        ss.should.have.been.calledBefore(init)
+
+            it "using the current implementation", ->
+                checkStorage(@ob)
+
+            it "using the default implementation", ->
+                checkStorage(@ob2, Base::)
+
+
+
+
+
+
+
+
+
+
+
 
         describe "validates all its arguments w/__validate_intiializer__", ->
-            it "using the current implementation"
-            it "using the default implementation"
+
+            checkVI = (ob, impl=ob) ->
+                withSpy impl, '__setup_storage__', (ss) =>
+                    withSpy impl, '__validate_initializer__', (v) =>
+                        Base.call(ob, arg1={}, arg2={})
+                        v.should.have.been.calledTwice
+                        v.should.have.been.always.calledOn(ob)
+                        v.should.have.been.calledWithExactly(arg1)
+                        v.should.have.been.calledWithExactly(arg2)
+
+            it "using the current implementation", -> checkVI(@ob)
+            it "using the default implementation", -> checkVI(@ob2, Base::)
+
 
         describe "calls __initialize_from__ last", ->
-            it "using the current implementation"
-            it "using the default implementation"
 
-    beforeEach -> @ob = Object.create(Base::)
+            checkInit= (ob, impl=ob) ->
+                withSpy impl, '__setup_storage__', (ss) =>
+                    withSpy impl, '__validate_initializer__', (v) =>
+                        withSpy impl, '__initialize_from__', (init) =>
+                            Base.call(ob, arg={})
+                            init.should.have.been.calledOnce
+                            init.should.have.been.calledOn(ob)
+                            init.should.have.been.calledWithExactly(arg)
+                            init.should.have.been.calledAfter(ss)
+                            init.should.have.been.calledAfter(v)
+
+            it "using the current implementation", -> checkInit(@ob)
+            it "using the default implementation", -> checkInit(@ob2, Base::)
+
+
+
+
+
+
+
+
+
+
 
     describe "__setup_storage__", ->
 
@@ -316,14 +380,6 @@ describe "Instance Initialization", ->
         it "makes .__props non-enumerable", ->
             @ob.__setup_storage__()
             Object.keys(@ob).should.eql []
-
-
-
-
-
-
-
-
 
 
     describe "__validate_initializer__", ->
@@ -341,31 +397,57 @@ describe "Instance Initialization", ->
             (=> @ob.__validate_initializer__(new class))
             .should.throw TypeError, /must be plain Objects or schema-compatible/
 
+
+
+
+
+
+
+
+
+
+
+
         describe "invokes __validate_names__ on plain objects", ->
 
-            it "using the current implementation", ->
-
-                withSpy @ob, '__validate_names__', (vn) =>
-                    @ob.__validate_initializer__(@ob)
+            checkValidate = (ob, impl=ob) ->
+                withSpy impl, '__validate_names__', (vn) =>
+                    impl.__validate_initializer__.call(ob, ob)
                     vn.should.not.have.been.called
 
-                withSpy @ob, '__validate_names__', (vn) =>
-                    @ob.__validate_initializer__(arg = {})
+                withSpy impl, '__validate_names__', (vn) =>
+                    impl.__validate_initializer__.call(ob, arg = {})
                     vn.should.have.been.calledOnce
-                    vn.should.have.been.calledOn(@ob)
+                    vn.should.have.been.calledOn(ob)
                     vn.should.have.been.calledWithExactly(arg)
+
+            it "using the current implementation", ->
+                checkValidate(@ob)
 
             it "using the default implementation", ->
-                @ob = new class
-                withSpy Base::, '__validate_names__', (vn) =>
-                    Base::__validate_initializer__.call(@ob, @ob)
-                    vn.should.not.have.been.called
+                checkValidate(new class, Base::)
 
-                withSpy Base::, '__validate_names__', (vn) =>
-                    Base::.__validate_initializer__.call(@ob, arg = {})
-                    vn.should.have.been.calledOnce
-                    vn.should.have.been.calledOn(@ob)
-                    vn.should.have.been.calledWithExactly(arg)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     describe "__validate_names__", ->
 
@@ -374,6 +456,7 @@ describe "Instance Initialization", ->
             @ob.__validate_names__(x:2)
             (=> @ob.__validate_names__(constructor: 99))
             .should.throw TypeError, "Unknown property: constructor"
+
 
     describe "__initialize_from__", ->
 
@@ -397,7 +480,6 @@ describe "Instance Initialization", ->
             defineProperties @ob, z: spec(0, required: yes), null, @ob
             (=> @ob.__initialize_from__({x:1}, {y:2}))
             .should.throw TypeError, "Missing required property: z"
-
 
 
 

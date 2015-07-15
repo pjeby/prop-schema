@@ -82,6 +82,22 @@
 
     class props.Base
 
+        getter = (name) ->
+            -> (@[name] ? Base::[name]).apply(this, arguments)
+
+        defaultThis = do -> this
+
+        setupStorage = getter('__setup_storage__')
+        validateNames = getter('__validate_names__')
+        validateInitiaizer = getter('__validate_initializer__')
+        initFrom = getter('__initialize_from__')
+
+        constructor: ->
+            throw new TypeError("Must create with new") if this is defaultThis
+            setupStorage.call(this)
+            validateInitiaizer.call(this, arg) for arg in arguments
+            initFrom.apply(this, arguments)
+
         __prop_desc__: (name, spec) ->
             get: -> @__props[name]
             set: (v) -> @__props[name] = spec.convert(v)
@@ -95,10 +111,15 @@
 
         __validate_initializer__: (arg) ->
             if props.isPlainObject(arg)
-                (@__validate_names__ ? Base::__validate_names__).call(this, arg)
+                validateNames.call(this, arg)
             else throw new TypeError(
                 "Arguments must be plain Objects or schema-compatible"
             ) unless arg instanceof @constructor
+
+
+
+
+
 
         has = Object::hasOwnProperty
 
@@ -117,6 +138,26 @@
                     if spec.required then throw new TypeError(
                         "Missing required property: "+name
                     ) else @[name] = @__defaults__[name]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
