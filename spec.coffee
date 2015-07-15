@@ -339,29 +339,29 @@ describe "Composed types", ->
         it "accepts numbers >= 0", -> @shouldOK(1, 1)
 
 
-describe "props(cls, schema)", ->
 
-    it "-> defineProperties(cls.prototype, schema, undefined, cls.prototype)", ->
-        withSpy props, 'defineProperties', (dp) ->
-            props(class cls, schema={})
-            dp.should.have.been.calledOnce
-            dp.should.have.been.calledWithExactly(
-                cls::, schema, undefined, cls::
-            )
 
-describe "props(schema)", ->
 
-    it "returns a new subclass of props.Base", ->
-        cls = props(schema={})
-        expect(Object.getPrototypeOf(cls::)).to.equal Base::
 
-    it "-> defineProperties(cls.prototype, schema, undefined, cls.prototype)", ->
-        withSpy props, 'defineProperties', (dp) ->
-            cls = props(schema={})
-            dp.should.have.been.calledOnce
-            dp.should.have.been.calledWithExactly(
-                cls::, schema, undefined, cls::
-            )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -613,7 +613,7 @@ describe "Utilities", ->
 
 
 
-    describe "defineProperties(ob, schema)", ->
+    describe "schema.defineProperties(ob)", ->
 
         schema = x: spec(42, parseInt)
 
@@ -654,7 +654,7 @@ describe "Utilities", ->
 
 
 
-    describe "defineProperties(ob, schema, factory)", ->
+    describe "schema.defineProperties(ob, factory)", ->
 
         describe "invokes factory(name, spec) for each schema item", ->
 
@@ -695,7 +695,29 @@ describe "Utilities", ->
 
 
 
-    describe "defineProperties(ob, schema, factory, proto)", ->
+describe "props(specs)", ->
+
+    it "returns a new subclass of props.Base", ->
+        cls = props(schema={})
+        expect(Object.getPrototypeOf(cls::)).to.equal Base::
+
+    it "-> defineProperties(cls.prototype, schema, undefined, cls.prototype)", ->
+        withSpy props, 'defineProperties', (dp) ->
+            cls = props(schema={})
+            dp.should.have.been.calledOnce
+            dp.should.have.been.calledWithExactly(
+                cls::, schema, undefined, cls::
+            )
+
+describe "props(cls, specs)", ->
+
+        it "-> defineProperties(cls.prototype, schema, undefined, cls.prototype)", ->
+            withSpy props, 'defineProperties', (dp) ->
+                props(class cls, schema={})
+                dp.should.have.been.calledOnce
+                dp.should.have.been.calledWithExactly(
+                    cls::, schema, undefined, cls::
+                )
 
         expectNamedSpec = (spec, name, base, message) ->
             expect(spec.name).to.equal(name, message+": bad name")
@@ -708,6 +730,11 @@ describe "Utilities", ->
 
         beforeEach ->
             defineProperties(@ob={}, schema1, null, @proto={})
+
+
+
+
+
 
         describe "initially configures __schema__ with", ->
             it ".specs", ->
@@ -723,17 +750,6 @@ describe "Utilities", ->
             it ".names", ->
                 expect(@proto.__schema__.names)
                 .to.eql ['b','c','a']
-
-
-
-
-
-
-
-
-
-
-
 
 
         describe "updates __schema__ with", ->
@@ -756,6 +772,11 @@ describe "Utilities", ->
             it ".names", ->
                 expect(@proto.__schema__.names).to.eql ['b', 'c', 'a', 'd']
 
+
+
+
+
+
         describe "inherits from superclass __schema__", ->
 
             beforeEach ->
@@ -776,7 +797,6 @@ describe "Utilities", ->
                 ['b', 'c', 'a'].forEach (name) =>
                     expectNamedSpec(specs[name], name, schema1[name], name+"(base)")
 
-
             it ".defaults", ->
                 expect(items(@proto.__schema__.defaults))
                 .to.eql [['b', 'b'], ['c', 'c'], ['a', 'a']]
@@ -786,26 +806,6 @@ describe "Utilities", ->
             it ".names", ->
                 expect(@proto.__schema__.names).to.eql ['b', 'c', 'a']
                 expect(@proto2.__schema__.names).to.eql ['b', 'c', 'a', 'd']
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
