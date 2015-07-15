@@ -1,6 +1,6 @@
 {
   "name": "prop-schema",
-  "version": "0.8.0",
+  "version": "0.1.0",
   "description": "Specify validation schemas for Option objects",
   "repository": "git@github.com:pjeby/prop-schema.git",
   "homepage": "https://github.com/pjeby/prop-schema",

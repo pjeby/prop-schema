@@ -106,7 +106,9 @@ describe "Examples", ->
                     {title: "Yo!!"}, {cols:5}, r2, {sql: "WHAT?"}
                   ); r3.__props""", "{ sql: 'X', cols: 5, title: 'Yo!!' }\n")
 
-
+        it "JSON works when props are defined", ->
+            @run("props.defineProperties(r1, r1.__specs__); JSON.stringify(r1)"
+            ).should.equal '{"sql":"X","cols":80,"title":"Hello"}'
 
 
 
