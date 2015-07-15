@@ -25,7 +25,7 @@ Features include:
 * [Developer's Guide](#developers-guide)
   * [Defining Classes' Schema](#defining-classes-schema)
     * [Initializing properties](#initializing-properties)
-    * [Subclassing and Schema Extensions](#subclassing-and-schema-extensions)
+    * [Subclassing and Schema Updates](#subclassing-and-schema-updates)
     * [JSON, util.inspect, hasOwnProperty, Object.keys(), etc.](#json-utilinspect-hasownproperty-objectkeys-etc)
   * [Specifying Properties](#specifying-properties)
     * [Using `props.spec()`](#using-propsspec)
@@ -34,7 +34,7 @@ Features include:
   * [Defining New Property Types](#defining-new-property-types)
     * [Using `props.type(typeOrFunction,...)`](#using-propstypetypeorfunction)
     * [Using `props.check(message, filter)`](#using-propscheckmessage-filter)
-  * [Extending And Customizing](#extending-and-customizing)
+  * [Schema Objects and Customization](#schema-objects-and-customization)
     * [Constructor Behavior](#constructor-behavior)
     * [Customizing Storage](#customizing-storage)
   * [Misc. Utility functions](#misc-utility-functions)
@@ -133,6 +133,7 @@ props(Handler, {
 })
 
 function Handler() {
+  var schema = this.__schema__;
   // Default initializes from all args, but you can pass whatever you want here
   props.Base.apply(this, arguments);
   // ...and now you can do stuff with initialized properties here
@@ -143,10 +144,9 @@ function Handler() {
 
 ### Defining Classes' Schema
 
-As shown in the synopsis above, you can use `props-schema` with an existing class, or you can have it create a class for you.  If all you need from the constructor is to populate your schema-controlled properties, and you are using plain Javascript to set up your methods (or don't have any), then it's simplest to just call `props(schema)` to get a new class.
+As shown in the synopsis above, you can use `props-schema` with an existing class, or you can have it create a class for you.  If all you need from the constructor is to populate your schema-controlled properties, and you are using plain Javascript to set up your methods (or don't have any), then it's simplest to just call `props(specs)` to get a new class.
 
-However, if you're using ES6, CoffeeScript, or some other language or framework to write your methods, or if you need a different constructor signature, use `props(MyClass, schema)` instead, to add schema to your class after it has been created.
-
+However, if you're using ES6, CoffeeScript, or some other language or framework to write your methods, or if you need a different constructor signature, use `props(MyClass, specs)` instead, to add a schema to your class after it has been created.
 
 #### Initializing properties
 
@@ -156,19 +156,19 @@ If you just want all properties to be initialized to default values, use `props.
 
 If you want to explicitly initialize properties, you can pass a plain Object with the property names and values, or an instance of the same class to copy from.  That is, `props.Base.call(this, {name: val, ...})` or `prop.Base.call(this, instanceToCopyFrom)`.
 
-`prop.Base` actually accepts multiple data sources, with earlier sources' properties overriding later ones, so you can do things like, `props.Base.call(this, {name: val, ...}, instanceToCopyFrom)` to copy another instance while overriding a few properties.  (You can also use `props.Base.apply(this, arguments)`, if you want to just pass through all of your constructor's arguments as data sources, which is how classes created by `props(schema)` work.)
+`prop.Base` actually accepts multiple data sources, with earlier sources' properties overriding later ones, so you can do things like, `props.Base.call(this, {name: val, ...}, instanceToCopyFrom)` to copy another instance while overriding a few properties.  (You can also use `props.Base.apply(this, arguments)`, if you want to just pass through all of your constructor's arguments as data sources, which is how classes created by `props(specifiers)` work.)
 
 Regardless of the way you obtain and supply these data sources, only properties defined in the current class's schema will be copied from them.  And if any plain Objects contain any extraneous properties that are not part of the schema, an error will be thrown.
 
 These initialization behaviors should be compatible with most use cases, but occasionally you may need to support copying from other class instances or allow extraneous properties, etc.  In that event, you can define certain special methods on your class in order to change the default behaviors, as we will describe in a later section on customizing constructor behavior.
 
 
-#### Subclassing and Schema Extensions
+#### Subclassing and Schema Updates
 
 Once a class has a schema, you can add additional properties (or override them), by calling `props()` on the class again, e.g.:
 
 ```javascript
-props(MyClass, moreSchema) // add moreSchema to the MyClass schema
+props(MyClass, moreSpecs) // add moreSpecs to the MyClass schema
 ```
 
 Once a class has schema, you can also subclass it, and it will inherit the schema from its base class.  If you want to extend the subclass schema, just call `props()` on the subclass, with the additional or overriding properties.  For example, in ES6:
@@ -198,14 +198,15 @@ function Subclass () {
 
 util.inherits(Subclass, MyClass);
 
+props(Subclass, additionalProps);   // must be *after* the inherits() call!
+
 Subclass.prototype.whatever = function() { ... } // etc.
 
-props(Subclass, additionalProps);
 ```
 
 As you can see, `prop-schema` is not dependent on any particular inheritance implementation: as long as your subclass's prototype is an instance of its base class, and the base class's schema is set up before creating the subclass schema, it will work.
 
-(For example, if you're using Node's `util.inherits()`, just make sure you've called both `props(MyClass, baseSchema)` and `util.inherits(Subclass, MyClass)` before you call `props(Subclass, extraSchema)`.)
+(For example, if you're using Node's `util.inherits()`, just make sure you've called both `props(MyClass, baseSchema)` and `util.inherits(Subclass, MyClass)` before you call `props(Subclass, moreProps)`.)
 
 > Note: there is currently not any way to *remove* a property in a subclass schema.  If you are trying to do that, you're violating the "subclass substitutability" principle, which probably means you're using inheritance for something it's not designed for.  The substitutability principle means a subclass schema should always include all of its base class properties, and any property value produced by the subclass should be usable in the same property in the base class.  `prop-schema` does not currently enforce this principle, but it may do so in the future.
 
@@ -358,45 +359,35 @@ So if you already have a validation function, it's simplest to use `props.check(
 
 By the way, the `filter` function is actualy *optional*: if you omit it, the check will always fail, and so the error will always be thrown!  This is useful to add at the end of an `.or()` chain, to provide a more-informative error message.  It will only be invoked if all other attempts to validate the property have failed, so you can use it to list out all the possible kinds of values the property type accepts.
 
+### Schema Objects and Customization
 
-### Extending And Customizing
+While `props-schema` offers sensible default behaviors, some use cases may require customizing or extending how construction works, properties are stored, descriptors are generated, etc.
 
-While `props-schema` offers sensible default behaviors, some use cases may require customizing or extending how construction works or how properties are stored, descriptors are generated, etc.
+So, to support these use cases, the `props()` function allows you to provide an extra argument that contains various "extension methods", to override various aspects of property storage and instance initialization.  Specifically, you can call `props(specifiers, extensions)` to create a class with the given extensions, or `props(ExistingClass, specifiers, extensions)` to add the extensions to an existing class.
 
-So, to support these use cases, the `props()` function and `props.Base` constructor look for and invoke a variety of special methods on your class's prototype, so your classes can take more control over these processes.
-
-If you create your class using `props(schema)` or by inheriting from `props.Base`, your class' prototype will already include the default implementations of these special methods.  This means that if you want to invoke the default implementations from within your overrides (and are using ES6, CoffeeScript, etc.) you can use `super` to do so.
-
-However, if you are using plain, "class-less" Javascript, or if you create your own class without inheriting from `props.Base`, you can call a special method's default implementation from your override using:
-
-* `props.Base.prototype.__whatever__.call(this, ...)`
-
-Note that you *only* need to define the special methods you want to override, whether or not you are subclassing `props.Base`.  If your prototype doesn't include or inherit a given special method, `prop-schema` automatically falls back to default behavior for that method.
-
-Currently, there are five special methods you can override to customize constructor behavior and property storage.
+Currently, there are five special methods you can override to customize constructor behavior and property storage.  These methods already exist by default on newly-created schemas, so you only need to supply the ones you want to customize.
 
 
 #### Constructor Behavior
 
 The default constructor for `props.Base` accepts any number of arguments, as long as they are all either plain objects or instances of the current class.  Plain object arguments are checked for invalid names (i.e. ones not listed in the schema), and all properties are initialized using the first match found in the arguments.  Argument precedence is left-to-right, such that the right-most arguments supply defaults for arguments to the left.
 
-These behaviors are all controlled by the following special methods, which you can override to change them:
+These behaviors are all controlled by the following `__schema__` methods, which you can customize by adding them to your schema's `extensions`:
 
-* `__validate_initializer__(arg)` -- throws an error if `arg` isn't a plain `Object` or an instance of the current class.  If a plain object, it also calls `this.__validate_names__(arg)` to check for unrecognized properties.  It is called once for each argument passed to `props.Base`, before all the arguments are passed to `__initialize_from__()`.  Can be overridden to change what type of objects are acceptable data sources for initialization.
+* `.propertiesFrom(source,...)` -- returns an object with one own-property for each property in the schema, initialized to the default value or the first value supplied by any of the given sources.  If none of the sources has a value for a `required` property, an error is thrown.  It's called by `props.Base()` in order to get an object's initial properties, and can be overridden to change argument precedence or the handling of `required` properties.
 
-* `__validate_names__(arg)` -- throws an error if arg has any own-properties that aren't listed in this class's schema.  (Called by `__validate_initializer__` when an argument is a plain object.)  You can override this to e.g. ignore unrecognized properties.
+* `.toInitializer(arg)` -- throws an error if `arg` isn't a plain `Object` or an object with a compatible schema.  (That is, a schema with at least one property in common with the current schema.)  If a plain object, it also calls `.validateNames(arg)` to check for unrecognized properties.  If it's an object with a compatible schema, the compatible properties will be extracted and returned in a plain object.  It's called by `.propertiesFrom()` to convert each of its arguments to a usable data source.  Can be overridden to support extracting data from other sorts of objects.
 
-* `__initialize_from__(source,...)` -- initialize the current instance by searching each `source` for all property names in the schema, with earlier values overriding later ones.  If no argument defines a property, it's initialized to the default value for that property.  (Unless it's required, in which case an error is thrown.)  Override this if you want to change the precedence order, or the handling of `required` properties.
+* `.validateNames(arg)` -- throws an error if arg has any own-properties that aren't listed in this class's schema.  Returns `arg` otherwise.  (Called by `.toInitializer()` when an argument is a plain object.)  You can override this to e.g. ignore unrecognized properties.
 
-Note that, before any of these methods are called, `props.Base` will first invoke the `__setup_storage__()` method to initialize property storage; see the next section for more details.)
 
 #### Customizing Storage
 
-By default, the values of schema-based properties are stored in a non-enumerable `__props` property on an object, but you can change this by overriding *both* of the following methods in your classes:
+By default, the values of schema-based properties are stored in a non-enumerable `__props` property on an object, but you can change this by supplying *both* of the following extensions when creating your schema:
 
-* `__setup_storage__()` -- creates a non-enumerable `__props` property for storing property values.  (Called by the `props.Base` constructor before argument processing.)
+* `.setupStorage(ob, values?)` -- Set up property storage for `ob`, optionally initializing them using `values`.  The default creates a non-enumerable `__props` property on `ob` for storing property values, containing a copy of the schema `.defaults`, and then setting any properties contained in `values`.  (This method is called by the `props.Base` constructor, passing in `.propertiesFrom(arguments...)`.)
 
-* `__prop_desc__(name, spec)` -- returns an ES5 property descriptor for the given property name and specifier.  The default returns something like:
+* `.descriptorFor(name, spec)` -- Return an ES5 property descriptor for the given property name and specifier.  The default returns something like:
 
 ```javascript
 {
@@ -407,25 +398,13 @@ By default, the values of schema-based properties are stored in a non-enumerable
 }
 ```
 
-Since you have access to the `spec` in `__prop_desc__()`, you can use its `.meta` data to customize the descriptor, e.g. if you want to create lazy-loading database properties or some such.
+Since you have access to the `spec` in `descriptorFor()`, you can use its `.meta` data to customize the descriptor, e.g. if you want to create lazy-loading database properties or some such.
 
-Note: even though `__prop_desc__()` is technically a method, it is never actually invoked on an instance of your class: it is *always* called as a function with no `this`.  All it has access to, is the name and property specifier.
+In addition to the above methods, there is also a third storage-related method that you probably don't need to override, but which you may find convenient for certain use cases:
 
-Also, note that `__prop_desc__()` is called by `props()`, so be sure that you have defined it in your class's prototype **before** you try to define the schema for your class!  Otherwise, you may end up with broken descriptors using the superclass or default descriptors, e.g.:
+* `.defineProperties(ob, factory?)` -- define an ES5 property on `ob` for every property in the schema, calling `factory(name, spec)` to obtain the descriptor.  If `factory` isn't supplied, the schema's `.descriptorFor()` method is used.
 
-```javascript
-// RIGHT way:
-function Whatever() { props.Base.apply(this, arguments); }
-Whatever.prototype.__prop_desc__ = function (name, spec) { ... }
-Whatever.prototype.__setup_storage__ = function (name) { ... }
-props(Whatever, { ... }) // always call *after* storage method overrides!
-
-// WRONG way:
-function Whatever() { props.Base.apply(this, arguments); }
-props(Whatever, { ... }) // BAD: this will use the DEFAULT __prop_desc__!
-Whatever.prototype.__prop_desc__ = function (name, spec) { ... }
-Whatever.prototype.__setup_storage__ = function (name) { ... }
-```
+This method is automatically called for you on the relevant prototype when calling `props()` or `props.defineSchema()`, to set up inheritable descriptors.   But if you need to attach descriptors directly to an object without inheriting them from a prototype, or are creating some type of proxy objects, you may find it useful.
 
 
 ### Misc. Utility functions
@@ -438,4 +417,4 @@ For your convenience, `prop-schema` exposes a few of its internally-used utility
 
 * `props.compose(typeOrFunction, ...)` -- similar to `props.type()`, except that it returns a converter/validator function instead of a property type.  That is, the returned function takes a value and returns a converted value or throws an error.  It does *not* have `.or()` or `.and()` methods, nor can it be used as shorthand to specify properties.  You will probably never need this function unless you are creating your own type composition functions, or wish to turn a type back into a converter/validator function.  (i.e. `props.compose(aType)` converts `aType` back to a plain converter/validator function.)
 
-* `props.defineSchema(prototype, specs)` -- create and/or update `prototype.__schema__` with the specifiers in `specs`, and add/update the appropriate property descriptors on `prototype`.  This is basically the internal implementation of the `props()` function, minus the syntax sugar.
+* `props.defineSchema(prototype, specs, options?)` -- create and/or update `prototype.__schema__` with the specifiers in `specs`, the options in `options` (if supplied), and add/update the appropriate property descriptors on `prototype`.  (This is basically the internal implementation of the `props()` function, minus the syntax sugar.)

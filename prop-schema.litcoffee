@@ -1,11 +1,14 @@
 # Schema-Driven Properties
 
     args = require 'normalize-arguments'
+    has = Object::hasOwnProperty
 
-    module.exports = props = (cls, specs) ->
-        [cls, specs] = args(arguments, [args.fn(), args.object({})])
+    module.exports = props =  ->
+        [cls,       specs,       options] = args(arguments, [
+         args.fn(), args.object, args.object()
+        ])
         cls ?= class extends props.Base
-        props.defineSchema(cls::, specs)
+        props.defineSchema(cls::, specs, options)
         cls
 
     props.isPlainObject = (val) ->
@@ -35,6 +38,7 @@
             props.type (v) -> try f.call(this, v) catch e then g.call(this, v)
         return factory
 
+
     props.check = (message, filter) -> props.type (val) ->
         throw new TypeError @name+" "+message unless filter?(val)
         return val
@@ -62,31 +66,76 @@
         schema.defaults = props.assign {}, schema.defaults
         return schema
 
-    defaultSchema =
-        __update: (specs) ->
-            for name in Object.keys(specs)
-                @specs[name] = spec = Object.create(
-                    specs[name], name: value: name, enumerable: yes
-                )
-                @defaults[name] = spec.value
-            @names = Object.keys(@specs)
-            return this
-
-        defineProperties: (ob, factory) ->
-            factory ?= ob.__prop_desc__ ? props.Base::__prop_desc__
-            for name in @names
-                Object.defineProperty(ob, name, factory(name, @specs[name]))
-            return ob
-
-
-
-    props.defineSchema = (proto, specs, factory) ->
+    props.defineSchema = (proto, specs, options) ->
         unless proto.hasOwnProperty('__schema__')
             Object.defineProperty(
                 proto, '__schema__', value: createSchema(proto.__schema__)
             )
-        proto.__schema__.__update(specs).defineProperties(proto, factory)
-        return proto.__schema__
+        schema = props.assign(proto.__schema__, options).__update(specs)
+        schema.defineProperties(proto)
+        return schema
+
+
+
+
+
+
+    defaultSchema =
+
+        defineProperties: (ob, factory) ->
+            factory ?= @descriptorFor
+            for name in @names
+                Object.defineProperty(ob, name, factory.call(this, name, @specs[name]))
+            return ob
+
+        descriptorFor: (name, spec) ->
+            get: -> @__props[name]
+            set: (v) -> @__props[name] = spec.convert(v)
+            configurable: yes
+            enumerable: yes
+
+        setupStorage: (ob, values = @defaults) ->
+            Object.defineProperty(ob, '__props', value: props.assign({},values))
+            props.assign(ob, values)
+
+        toInitializer: (ob) ->
+            if not (other = ob?.__schema__)?
+                return @validateNames(ob) if props.isPlainObject(ob)
+            specs = @specs
+            data = {}
+            names = for n in other?.names ? [] when has.call(specs,n)
+                data[n] = ob[n]
+                n
+            return data if names.length
+            throw new TypeError(
+                "Arguments must be plain Objects or schema-compatible"
+            )
+
+        propertiesFrom: ->
+            sources = (@toInitializer(arg) for arg in arguments).reverse()
+            input = props.assign {}, sources...
+            output = props.assign {}, @defaults, input
+            for name in @names when not has.call(input, name)
+                if @specs[name].required then throw new TypeError(
+                    "Missing required property: "+name
+                )
+            return output
+
+        validateNames: (ob) ->
+            specs = @specs
+            for k in Object.keys(ob) when not has.call(specs, k)
+                throw new TypeError "Unknown property: "+k
+            return ob
+
+    Object.defineProperties defaultSchema, __update: value: (specs) ->
+        for name in Object.keys(specs)
+            @specs[name] = spec = Object.create(
+                specs[name], name: value: name, enumerable: yes
+            )
+            @defaults[name] = spec.value
+        @names = Object.keys(@specs)
+        return this
+
 
     class props.spec
         identity = (v) -> v
@@ -99,65 +148,16 @@
             @required = @meta.required ? no
             @convert = if rest.length then props.compose(rest...) else identity
 
-    class props.Base
-        getter = (name) ->
-            -> (@[name] ? Base::[name]).apply(this, arguments)
 
+    class props.Base
         defaultThis = do -> this
-        setupStorage = getter('__setup_storage__')
-        validateNames = getter('__validate_names__')
-        validateInitiaizer = getter('__validate_initializer__')
-        initFrom = getter('__initialize_from__')
 
         constructor: ->
-            throw new TypeError("Must create with new") if this is defaultThis
-            setupStorage.call(this)
-            validateInitiaizer.call(this, arg) for arg in arguments
-            initFrom.apply(this, arguments)
-
-        __prop_desc__: (name, spec) ->
-            get: -> @__props[name]
-            set: (v) -> @__props[name] = spec.convert(v)
-            configurable: yes
-            enumerable: yes
-
-        __setup_storage__: ->
-            Object.defineProperty(
-                this, '__props', value: props.assign {}, @__schema__.defaults
+            if not this? or this is defaultThis
+                throw new TypeError("Must create with new")
+            else @__schema__.setupStorage(
+                this, @__schema__.propertiesFrom(arguments...)
             )
-
-        __validate_initializer__: (arg) ->
-            if props.isPlainObject(arg)
-                validateNames.call(this, arg)
-            else throw new TypeError(
-                "Arguments must be plain Objects or schema-compatible"
-            ) unless arg instanceof @constructor
-
-        has = Object::hasOwnProperty
-
-        __validate_names__: (arg) ->
-            schema = @__schema__.specs
-            for k in Object.keys(arg) when not has.call(schema, k)
-                throw new TypeError "Unknown property: "+k
-
-        __initialize_from__: ->
-            schema = @__schema__
-            for name in schema.names
-                spec = schema.specs[name]
-                for arg in arguments
-                    if got = name of arg # XXX has.call(arg, name)
-                        @[name] = arg[name]; break
-                unless got
-                    if spec.required then throw new TypeError(
-                        "Missing required property: "+name
-                    ) else @[name] = schema.defaults[name]
-
-
-
-
-
-
-
 
 
 

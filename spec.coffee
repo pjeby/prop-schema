@@ -370,7 +370,7 @@ describe "Composed types", ->
 describe "Instance Initialization", ->
 
     beforeEach ->
-        @ob = Object.create(Base::)
+        @ob = {}
         @ob2 = {}
         defineSchema(@ob, {})
 
@@ -383,20 +383,13 @@ describe "Instance Initialization", ->
         it "throws if called without explicit `this`", ->
             (-> Base() ).should.throw TypeError
 
-        describe "invokes __setup_storage__ before validation", ->
-            checkStorage = (ob, impl=ob) ->
-                withSpy impl, '__setup_storage__', (ss) =>
-                    withSpy impl, '__initialize_from__', (init) =>
-                        Base.call(ob)
-                        ss.should.have.been.calledOnce
-                        ss.should.have.been.calledOn(ob)
-                        ss.should.have.been.calledBefore(init)
-
-            it "using the current implementation", ->
-                checkStorage(@ob)
-
-            it "using the default implementation", ->
-                checkStorage(@ob2, Base::)
+        it "invokes __schema__.setupStorage(this) before validation", ->
+            withSpy @ob.__schema__, 'setupStorage', (ss) =>
+                withSpy @ob.__schema__, 'propertiesFrom', (init) =>
+                    Base.call(@ob)
+                    ss.should.have.been.calledOnce
+                    ss.should.have.been.calledAfter(init)
+                    ss.should.have.been.calledWithExactly(@ob, init.returnValues[0])
 
 
 
@@ -408,33 +401,40 @@ describe "Instance Initialization", ->
 
 
 
-        describe "validates all its arguments w/__validate_intiializer__", ->
+
+
+
+
+
+
+
+        describe "validates all its arguments w/__schema__.toInitializer()", ->
 
             checkVI = (ob, impl=ob) ->
-                withSpy impl, '__setup_storage__', (ss) =>
-                    withSpy impl, '__validate_initializer__', (v) =>
+                withSpy ob.__schema__, 'setupStorage', (ss) =>
+                    withSpy ob.__schema__, 'toInitializer', (ti) =>
                         Base.call(ob, arg1={}, arg2={})
-                        v.should.have.been.calledTwice
-                        v.should.have.been.always.calledOn(ob)
-                        v.should.have.been.calledWithExactly(arg1)
-                        v.should.have.been.calledWithExactly(arg2)
+                        ti.should.have.been.calledTwice
+                        ti.should.have.been.always.calledBefore(ss)
+                        ti.should.have.been.calledWithExactly(arg1)
+                        ti.should.have.been.calledWithExactly(arg2)
 
             it "using the current implementation", -> checkVI(@ob)
             it "using the default implementation", -> checkVI(@ob2, Base::)
 
 
-        describe "calls __initialize_from__ last", ->
+        describe "calls propertiesFrom() first", ->
 
             checkInit= (ob, impl=ob) ->
-                withSpy impl, '__setup_storage__', (ss) =>
-                    withSpy impl, '__validate_initializer__', (v) =>
-                        withSpy impl, '__initialize_from__', (init) =>
+                withSpy ob.__schema__, 'setupStorage', (ss) =>
+                    withSpy ob.__schema__, 'toInitializer', (ti) =>
+                        withSpy ob.__schema__, 'propertiesFrom', (init) =>
                             Base.call(ob, arg={})
                             init.should.have.been.calledOnce
-                            init.should.have.been.calledOn(ob)
+                            #init.should.have.been.calledOn(ob)
                             init.should.have.been.calledWithExactly(arg)
-                            init.should.have.been.calledAfter(ss)
-                            init.should.have.been.calledAfter(v)
+                            init.should.have.been.calledBefore(ss)
+                            init.should.have.been.calledBefore(ti)
 
             it "using the current implementation", -> checkInit(@ob)
             it "using the default implementation", -> checkInit(@ob2, Base::)
@@ -449,118 +449,77 @@ describe "Instance Initialization", ->
 
 
 
-    describe "__setup_storage__", ->
+    describe "__schema__.setupStorage(ob)", ->
 
         it "sets .__props to a copy of .__schema__.defaults", ->
             assign({}, @ob).should.eql {}
             expect(@ob.__props).to.not.exist
             @ob.__schema__.defaults = dflts = {x: 42}
-            @ob.__setup_storage__()
+            @ob.__schema__.setupStorage(@ob)
             expect(@ob.__props).to.eql dflts
             expect(@ob.__props).to.not.equal dflts
 
         it "makes .__props non-enumerable", ->
-            @ob.__setup_storage__()
+            @ob.__schema__.setupStorage(@ob)
             Object.keys(@ob).should.eql []
 
+    describe "__schema__.toInitializer", ->
 
-    describe "__validate_initializer__", ->
+        it "accepts (and returns) plain objects", ->
+            withSpy props, 'isPlainObject', (ipo) =>
+                expect(@ob.__schema__.toInitializer(arg = {})).to.equal arg
+                ipo.should.have.been.calledOnce
+                ipo.should.have.been.calledWithExactly(arg)
 
-        it "accepts plain objects", -> withSpy props, 'isPlainObject', (ipo) =>
-            @ob.__validate_initializer__(arg = {})
-            ipo.should.have.been.calledOnce
-            ipo.should.have.been.calledWithExactly(arg)
-
-        it "accepts instances of the current class", ->
-            @ob.constructor = class cls extends Base then constructor: ->
-            @ob.__validate_initializer__(new cls)
+        it "accepts objecsts with overlapping schema", ->
+            defineSchema(@ob, y: spec(42), z: spec(99)).setupStorage(@ob)
+            defineSchema(ob ={}, z: spec(1)).setupStorage(ob)
+            @ob.__schema__.toInitializer(ob)
 
         it "rejects unrelated classes", ->
-            (=> @ob.__validate_initializer__(new class))
+            (=> @ob.__schema__.toInitializer(new class))
             .should.throw TypeError, /must be plain Objects or schema-compatible/
 
+        it "invokes __schema__.validateNames on plain objects", ->
+            defineSchema(@ob, y: spec(42), z: spec(99)).setupStorage(@ob)
+            withSpy @ob.__schema__, 'validateNames', (vn) =>
+                @ob.__schema__.toInitializer(@ob)
+                vn.should.not.have.been.called
+            withSpy @ob.__schema__, 'validateNames', (vn) =>
+                @ob.__schema__.toInitializer(arg = {})
+                vn.should.have.been.calledOnce
+                vn.should.have.been.calledWithExactly(arg)
 
-
-
-
-
-
-
-
-
-
-
-        describe "invokes __validate_names__ on plain objects", ->
-
-            checkValidate = (ob, impl=ob) ->
-                withSpy impl, '__validate_names__', (vn) =>
-                    impl.__validate_initializer__.call(ob, ob)
-                    vn.should.not.have.been.called
-
-                withSpy impl, '__validate_names__', (vn) =>
-                    impl.__validate_initializer__.call(ob, arg = {})
-                    vn.should.have.been.calledOnce
-                    vn.should.have.been.calledOn(ob)
-                    vn.should.have.been.calledWithExactly(arg)
-
-            it "using the current implementation", ->
-                checkValidate(@ob)
-
-            it "using the default implementation", ->
-                cls = class
-                defineSchema(cls::, {})
-                checkValidate(new cls, Base::)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    describe "__validate_names__", ->
+    describe "__schema__.validateNames", ->
 
         it "rejects objects with enumerable-own properties not in schema", ->
             defineSchema @ob, x: spec(1)
-            @ob.__validate_names__(x:2)
-            (=> @ob.__validate_names__(constructor: 99))
+            @ob.__schema__.validateNames(x:2)
+            (=> @ob.__schema__.validateNames(constructor: 99))
             .should.throw TypeError, "Unknown property: constructor"
 
 
-    describe "__initialize_from__", ->
+    describe "__schema__.propertiesFrom(sources...)", ->
 
         beforeEach ->
             defineSchema @ob, y: spec(42), z: spec(99)
             @ob.__props = {}
 
         it "accepts multiple sources", ->
-            @ob.__initialize_from__({y:1}, {z:2})
-            @ob.__props.should.eql {y: 1, z: 2}
+            @ob.__schema__.propertiesFrom({y:1}, {z:2})
+            .should.eql {y: 1, z: 2}
 
         it "uses the first source with a property", ->
-            @ob.__initialize_from__({y:1}, {y:2})
-            @ob.__props.should.eql {y: 1, z: 99}
+            @ob.__schema__.propertiesFrom({y:1}, {y:2})
+            .should.eql {y: 1, z: 99}
 
         it "initializes all properties, even if not specified", ->
-            @ob.__initialize_from__({q:1}, {r:2}, {z:15})
-            @ob.__props.should.eql {y: 42, z: 15}
+            @ob.__schema__.propertiesFrom({z:15}, {z:0})
+            .should.eql {y: 42, z: 15}
 
         it "throws when a required property is missing", ->
             defineSchema @ob, z: spec(0, required: yes)
-            (=> @ob.__initialize_from__({x:1}, {y:2}))
+            (=> @ob.__schema__.propertiesFrom({y:2}))
             .should.throw TypeError, "Missing required property: z"
 
 
@@ -635,17 +594,17 @@ describe "Utilities", ->
                 @ob.x = "55 mph"
                 expect(@ob.__props).to.eql {x:55}
 
-        it "uses props.Base::__prop_desc__ as a default factory", ->
-            withSpy Base.prototype, '__prop_desc__', (s) ->
+        it "uses schema.descriptorFor() as its default factory", ->
+            withSpy schema, 'descriptorFor', (df) ->
                 schema.defineProperties(ob = {})
-                s.should.have.been.calledOnce
-                s.should.have.been.calledWith('x')
+                df.should.have.been.calledOnce
+                df.should.have.been.calledWith('x')
 
-        it "uses ob.__prop_desc__ as a factory if available", ->
-            ob = __prop_desc__: s = spy (name, ps) -> value: ps
-            schema.defineProperties(ob)
-            s.should.have.been.calledOnce
-            s.should.have.been.calledWith('x')
+
+
+
+
+
 
 
 
@@ -666,6 +625,7 @@ describe "Utilities", ->
                 my = this
                 schema.defineProperties @ob={}, @factory = (name, ps) ->
                     my.results.push name
+                    expect(this).to.equal schema
                     value: ps
 
             it "in schema order", ->
@@ -705,7 +665,7 @@ describe "props(specs)", ->
         withSpy props, 'defineSchema', (ds) ->
             cls = props(specs={})
             ds.should.have.been.calledOnce
-            ds.should.have.been.calledWithExactly(cls::, specs)
+            ds.should.have.been.calledWith(cls::, specs)
 
 
 describe "props(cls, specs)", ->
@@ -714,7 +674,7 @@ describe "props(cls, specs)", ->
         withSpy props, 'defineSchema', (ds) ->
             props(class cls, specs={})
             ds.should.have.been.calledOnce
-            ds.should.have.been.calledWithExactly(cls::, specs)
+            ds.should.have.been.calledWith(cls::, specs)
 
 
 describe "props.defineSchema(proto, specs)", ->
