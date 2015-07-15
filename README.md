@@ -21,6 +21,26 @@ Features include:
 
 <!-- toc -->
 
+* [Usage Synopsis](#usage-synopsis)
+* [Developer's Guide](#developers-guide)
+  * [Defining Classes' Schema](#defining-classes-schema)
+    * [Initializing properties](#initializing-properties)
+    * [Subclassing and Schema Extensions](#subclassing-and-schema-extensions)
+    * [JSON, util.inspect, hasOwnProperty, Object.keys(), etc.](#json-utilinspect-hasownproperty-objectkeys-etc)
+  * [Specifying Properties](#specifying-properties)
+    * [Using `props.spec()`](#using-propsspec)
+    * [Using a Type Expression](#using-a-type-expression)
+    * [Combining Types](#combining-types)
+  * [Defining New Property Types](#defining-new-property-types)
+    * [Using `props.type(typeOrFunction,...)`](#using-propstypetypeorfunction)
+    * [Using `props.check(message, filter)`](#using-propscheckmessage-filter)
+  * [Extending And Customizing](#extending-and-customizing)
+    * [Constructor Behavior](#constructor-behavior)
+    * [Customizing Storage](#customizing-storage)
+  * [Misc. Utility functions](#misc-utility-functions)
+
+<!-- toc stop -->
+
 ## Usage Synopsis
 
 ```javascript

@@ -121,8 +121,6 @@ describe "Examples", ->
 
 
 
-
-
 describe "Type and Function Composition", ->
 
     describe "Compositional Algebra", ->
