@@ -125,7 +125,9 @@ describe "Type and Function Composition", ->
 
         it "with all arguments", ->
             s = type(f=->)(17, "blah", m={fiz:"buz"})
-            expect(s).to.eql {value: 17, doc: "blah", meta:m, convert: f}
+            expect(s).to.eql {
+                value: 17, doc: "blah", meta:m, convert: f, required: no
+            }
 
         it "with just a value", ->
             s = type(f=->)(42)
@@ -143,8 +145,6 @@ describe "Type and Function Composition", ->
             expect(s.value).to.equal 99
             expect(s.meta).to.eql {x: 1}
             expect(s.convert).to.equal f
-
-
 
 
 
@@ -198,10 +198,10 @@ describe "Properrty Specifiers", ->
             expect(spec(42,f=->).convert).to.equal f
             expect(spec(42,{},type(f)).convert).to.equal f
 
-        it ".required == meta.required"
-
-
-
+        it ".required == meta.required", ->
+            expect(spec(0, required: yes).required).to.be.true
+            expect(spec(0, required: no).required).to.be.false
+            expect(spec(0).required).to.be.false
 
 describe "Basic types", ->
     for own k, v of defaults = {string:"x", number:42, boolean:yes, function:->}
@@ -376,27 +376,27 @@ describe "Instance Initialization", ->
             .should.throw TypeError, "Unknown property: constructor"
 
     describe "__initialize_from__", ->
-        it "accepts multiple sources"
-        it "uses the first source with a property"
-        it "initializes all properties, even if not specified"
-        it "throws when a required property is missing"
 
+        beforeEach ->
+            defineProperties @ob, y: spec(42), z: spec(99), null, @ob
+            @ob.__props = {}
 
+        it "accepts multiple sources", ->
+            @ob.__initialize_from__({y:1}, {z:2})
+            @ob.__props.should.eql {y: 1, z: 2}
 
+        it "uses the first source with a property", ->
+            @ob.__initialize_from__({y:1}, {y:2})
+            @ob.__props.should.eql {y: 1, z: 99}
 
+        it "initializes all properties, even if not specified", ->
+            @ob.__initialize_from__({q:1}, {r:2}, {z:15})
+            @ob.__props.should.eql {y: 42, z: 15}
 
-
-
-
-
-
-
-
-
-
-
-
-
+        it "throws when a required property is missing", ->
+            defineProperties @ob, z: spec(0, required: yes), null, @ob
+            (=> @ob.__initialize_from__({x:1}, {y:2}))
+            .should.throw TypeError, "Missing required property: z"
 
 
 

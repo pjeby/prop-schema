@@ -75,8 +75,8 @@
              args.any, args.string(""), args.object({})
             ])
             @meta = props.assign {}, meta
+            @required = @meta.required ? no
             @convert = if rest.length then props.compose(rest...) else identity
-
 
 
 
@@ -100,23 +100,23 @@
                 "Arguments must be plain Objects or schema-compatible"
             ) unless arg instanceof @constructor
 
+        has = Object::hasOwnProperty
+
         __validate_names__: (arg) ->
             schema = @__specs__
-            has = Object::hasOwnProperty
             for k in Object.keys(arg) when not has.call(schema, k)
                 throw new TypeError "Unknown property: "+k
 
-
-
-
-
-
-
-
-
-
-
-
+        __initialize_from__: ->
+            for name in @__names__
+                spec = @__specs__[name]
+                for arg in arguments
+                    if got = has.call(arg, name)
+                        @[name] = arg[name]; break
+                unless got
+                    if spec.required then throw new TypeError(
+                        "Missing required property: "+name
+                    ) else @[name] = @__defaults__[name]
 
 
 
