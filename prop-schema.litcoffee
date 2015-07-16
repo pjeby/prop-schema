@@ -4,11 +4,11 @@
     has = Object::hasOwnProperty
 
     module.exports = props =  ->
-        [cls,       specs,       options] = args(arguments, [
+        [cls,       specs,       extensions] = args(arguments, [
          args.fn(), args.object, args.object()
         ])
         cls ?= class extends props.Base
-        props.defineSchema(cls::, specs, options)
+        props.defineSchema(cls::, specs, extensions)
         cls
 
     props.isPlainObject = (val) ->
@@ -66,12 +66,12 @@
         schema.defaults = props.assign {}, schema.defaults
         return schema
 
-    props.defineSchema = (proto, specs, options) ->
+    props.defineSchema = (proto, specs, extensions) ->
         unless proto.hasOwnProperty('__schema__')
             Object.defineProperty(
                 proto, '__schema__', value: createSchema(proto.__schema__)
             )
-        schema = props.assign(proto.__schema__, options).__update(specs)
+        schema = props.assign(proto.__schema__, extensions).__update(specs)
         schema.defineProperties(proto)
         return schema
 

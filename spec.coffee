@@ -613,26 +613,26 @@ describe "Utilities", ->
 
 
 
-describe "props(specs)", ->
+describe "props(specs, extensions?)", ->
 
     it "returns a new subclass of props.Base", ->
         cls = props(schema={})
         expect(Object.getPrototypeOf(cls::)).to.equal Base::
 
-    it "-> defineSchema(cls.prototype, specs)", ->
+    it "-> defineSchema(cls.prototype, specs, extensions)", ->
         withSpy props, 'defineSchema', (ds) ->
-            cls = props(specs={})
+            c = props(s={}, e={})
             ds.should.have.been.calledOnce
-            ds.should.have.been.calledWith(same(cls::), same(specs))
+            ds.should.have.been.calledWithExactly(same(c::), same(s), same(e))
 
 
-describe "props(cls, specs)", ->
+describe "props(cls, specs, extensions?)", ->
 
-    it "-> defineSchema(cls.prototype, specs)", ->
+    it "-> defineSchema(cls.prototype, specs, extensions)", ->
         withSpy props, 'defineSchema', (ds) ->
-            props(class cls, specs={})
+            props(class c, s={}, e={})
             ds.should.have.been.calledOnce
-            ds.should.have.been.calledWith(same(cls::), same(specs))
+            ds.should.have.been.calledWithExactly(same(c::), same(s), e)
 
 
 describe "props.defineSchema(proto, specs, extensions?)", ->

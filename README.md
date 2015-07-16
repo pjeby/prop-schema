@@ -154,9 +154,9 @@ Before you can read or write any schema-controlled properties on an object, they
 
 If you just want all properties to be initialized to default values, use `props.Base.call(this)`, without any data sources.  This will work as long as you have no `required` properties, and all your default values are considered valid by their conversion/validation functions.
 
-If you want to explicitly initialize properties, you can pass a plain Object with the property names and values, or an instance of the same class to copy from.  That is, `props.Base.call(this, {name: val, ...})` or `prop.Base.call(this, instanceToCopyFrom)`.
+If you want to explicitly initialize properties, you can pass a plain Object with the property names and values, or an instance of the same class to copy from.  That is, `props.Base.call(this, {name: val, ...})` or `props.Base.call(this, instanceToCopyFrom)`.
 
-`prop.Base` actually accepts multiple data sources, with earlier sources' properties overriding later ones, so you can do things like, `props.Base.call(this, {name: val, ...}, instanceToCopyFrom)` to copy another instance while overriding a few properties.  (You can also use `props.Base.apply(this, arguments)`, if you want to just pass through all of your constructor's arguments as data sources, which is how classes created by `props(specifiers)` work.)
+`props.Base` actually accepts multiple data sources, with earlier sources' properties overriding later ones, so you can do things like, `props.Base.call(this, {name: val, ...}, instanceToCopyFrom)` to copy another instance while overriding a few properties.  (You can also use `props.Base.apply(this, arguments)`, if you want to just pass through all of your constructor's arguments as data sources, which is how classes created by `props(specifiers)` work.)
 
 Regardless of the way you obtain and supply these data sources, only properties defined in the current class's schema will be copied from them.  And if any plain Objects contain any extraneous properties that are not part of the schema, an error will be thrown.
 
@@ -417,4 +417,4 @@ For your convenience, `prop-schema` exposes a few of its internally-used utility
 
 * `props.compose(typeOrFunction, ...)` -- similar to `props.type()`, except that it returns a converter/validator function instead of a property type.  That is, the returned function takes a value and returns a converted value or throws an error.  It does *not* have `.or()` or `.and()` methods, nor can it be used as shorthand to specify properties.  You will probably never need this function unless you are creating your own type composition functions, or wish to turn a type back into a converter/validator function.  (i.e. `props.compose(aType)` converts `aType` back to a plain converter/validator function.)
 
-* `props.defineSchema(prototype, specs, options?)` -- create and/or update `prototype.__schema__` with the specifiers in `specs`, the options in `options` (if supplied), and add/update the appropriate property descriptors on `prototype`.  (This is basically the internal implementation of the `props()` function, minus the syntax sugar.)
+* `props.defineSchema(prototype, specs, extensions?)` -- create and/or update `prototype.__schema__` with the specifiers in `specs`, the extensions in `extensions` (if supplied), and add/update the appropriate property descriptors on `prototype`.  (This is basically the internal implementation of the `props()` function, minus the syntax sugar.)
