@@ -635,7 +635,7 @@ describe "props(cls, specs)", ->
             ds.should.have.been.calledWith(same(cls::), same(specs))
 
 
-describe "props.defineSchema(proto, specs)", ->
+describe "props.defineSchema(proto, specs, extensions?)", ->
 
         expectNamedSpec = (spec, name, base, message) ->
             expect(spec.name).to.equal(name, message+": bad name")
@@ -649,10 +649,10 @@ describe "props.defineSchema(proto, specs)", ->
         beforeEach ->
             defineSchema(@proto={}, schema1)
 
-
-
-
-
+        it "extends schema with extensions", ->
+            withSpy props, 'assign', (a) =>
+                s = defineSchema(p={}, {}, ext={})
+                a.should.have.been.calledWithExactly(same(s), same(ext))
 
         describe "initially configures __schema__ with", ->
             it ".specs", ->
