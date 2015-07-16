@@ -133,7 +133,6 @@ props(Handler, {
 })
 
 function Handler() {
-  var schema = this.__schema__;
   // Default initializes from all args, but you can pass whatever you want here
   props.Base.apply(this, arguments);
   // ...and now you can do stuff with initialized properties here
