@@ -98,7 +98,7 @@
             ob, '__props', value: props.assign {}, @defaults
         )
 
-        toInitializer: (ob) ->
+        toInitializer: (ob={}) ->
             if not (other = ob?.__schema__)?
                 return @validateNames(ob) if props.isPlainObject(ob)
             specs = @specs

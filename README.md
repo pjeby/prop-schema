@@ -102,6 +102,12 @@ new Report({sql: "Z", cols: 0}) // => TypeError: cols must be > 0
 var r1 = new Report({title: "Hello", sql:"X"}) 
 r1.__props // => { sql: "X", cols: 80, title: "Hello" }
 
+// Validation still happens when properties are set:
+r1.title = "!" // => TypeError: title must be at least 4 chars
+
+// And validation failure leaves the property unchanged
+r1.title       // => 'Hello'
+
 // Multiple arguments can be passed in order to combine/inherit properties
 var r2 = new Report({cols:20}, r1)
 r2.__props // => { sql: "X", cols: 20, title: "Hello" }
@@ -215,7 +221,7 @@ By default, the actual property values of an instance of a schema-controlled cla
 
 This can easily be worked around by calling `this.__schema__.defineProperties(this)` in your class's constructor, to forcibly add the descriptors to each instance.  The trade-off is a reduction in speed of property access, and increased storage space per instance, so it is not done by default.  There is also no way to undo it once it has been done to a given instance.  (Also, it's only a partial fix for `util.inspect()`, which will display all property values as `[Getter/Setter]` instead of their actual values.)
 
-Of course, if you want to avoid the performance cost, and only need to support `JSON.stringify()` or `util.inspect()`, you can always define a `.toJSON()` method that returns `.__props`, and/or a similar method for `.inspect()`.  (Which then works around the `Getter/Setter]` limitation.)
+Of course, if you want to avoid the performance cost, and only need to support `JSON.stringify()` or `util.inspect()`, you can always define a `.toJSON()` method that returns `.__props`, and/or a similar method for `.inspect()`.  (Which then works around the `[Getter/Setter]` limitation.)
 
 For more information on how properties are stored (and how to customize that storage), see the section below on "Customizing Storage".
 
@@ -375,7 +381,7 @@ These behaviors are all controlled by the following `__schema__` methods, which 
 
 * `.propertiesFrom(source,...)` -- returns an object with one own-property for each property in the schema, initialized to the default value or the first value supplied by any of the given sources.  If none of the sources has a value for a `required` property, an error is thrown.  It's called by `props.Base()` in order to get an object's initial properties, and can be overridden to change argument precedence or the handling of `required` properties.
 
-* `.toInitializer(arg)` -- throws an error if `arg` isn't a plain `Object` or an object with a compatible schema.  (That is, a schema with at least one property in common with the current schema.)  If a plain object, it also calls `.validateNames(arg)` to check for unrecognized properties.  If it's an object with a compatible schema, the compatible properties will be extracted and returned in a plain object.  It's called by `.propertiesFrom()` to convert each of its arguments to a usable data source.  Can be overridden to support extracting data from other sorts of objects.
+* `.toInitializer(arg)` -- Return a plain object with properties to read from `arg`.  Throws an error if `arg` isn't a plain `Object`, undefined/null, or an object with a compatible schema.  (That is, a schema with at least one property in common with the current schema.)  If a plain object, it also calls `.validateNames(arg)` to check for unrecognized properties.  If it's an object with a compatible schema (or null/undefined), the compatible properties will be extracted and returned in a plain object.  It's called by `.propertiesFrom()` to convert each of its arguments to a usable data source.  Can be overridden to support extracting data from other sorts of objects.
 
 * `.validateNames(arg)` -- throws an error if arg has any own-properties that aren't listed in this class's schema.  Returns `arg` otherwise.  (Called by `.toInitializer()` when an argument is a plain object.)  You can override this to e.g. ignore unrecognized properties.
 

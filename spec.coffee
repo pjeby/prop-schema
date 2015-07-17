@@ -449,6 +449,11 @@ describe "Instance Initialization", ->
                 vn.should.have.been.calledOnce
                 vn.should.have.been.calledWithExactly(same(arg))
 
+        it "returns an empty object for null or undefined", ->
+            expect(@ob.__schema__.toInitializer()).to.eql {}
+            expect(@ob.__schema__.toInitializer(null)).to.eql {}
+
+
     describe "__schema__.validateNames", ->
 
         it "rejects objects with enumerable-own properties not in schema", ->
@@ -480,11 +485,6 @@ describe "Instance Initialization", ->
             defineSchema @ob, z: spec(0, required: yes)
             (=> @ob.__schema__.propertiesFrom({y:2}))
             .should.throw TypeError, "Missing required property: z"
-
-
-
-
-
 
 
 
